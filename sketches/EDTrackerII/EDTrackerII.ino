@@ -166,18 +166,18 @@ int readIntEE(int address) {
 }
 
 void writeLongEE(int address,  long value) {
-  for (int i =0; i<4;i++)
+  for (int i = 0; i < 4; i++)
   {
-  EEPROM.write(address++, value & 0xff); // write lower byte
-  value = value >>8;
+    EEPROM.write(address++, value & 0xff); // write lower byte
+    value = value >> 8;
   }
 }
 
 long readLongEE(int address) {
-    return ((long)EEPROM.read(address + 3) << 24 |
-            (long)EEPROM.read(address + 2) << 16 |
-            (long)EEPROM.read(address + 1) << 8 | 
-            (long)EEPROM.read(address));
+  return ((long)EEPROM.read(address + 3) << 24 |
+          (long)EEPROM.read(address + 2) << 16 |
+          (long)EEPROM.read(address + 1) << 8 |
+          (long)EEPROM.read(address));
 }
 
 void setup() {
@@ -203,7 +203,7 @@ void setup() {
 
   orientation = constrain(EEPROM.read(EE_ORIENTATION), 0, 3);
 
-  xDriftComp = (float)readIntEE(EE_XDRIFTCOMP)/10000.0;
+  xDriftComp = (float)readIntEE(EE_XDRIFTCOMP) / 10000.0;
 
   // join I2C bus (I2Cdev library doesn't do this automatically)
   Wire.begin();
@@ -361,8 +361,8 @@ void loop()
       newX = newX - cx;
       newY = newY - cy;
       newZ = newZ - cz;
-      
-            // Before we mess with any of the DMP data log it to the UI if enabled
+
+      // Before we mess with any of the DMP data log it to the UI if enabled
       if (outputMode == UI)
       {
         Serial.print(newX , 6 ); // Yaw
@@ -385,8 +385,8 @@ void loop()
         Serial.print("\t");
         Serial.println(gyro[2]); // Roll
       }
-      
-     
+
+
       //clamp at 90 degrees left and right
       constrain(newX, -16383.0, 16383.0);
       constrain(newY, -16383.0, 16383.0);
@@ -428,12 +428,12 @@ void loop()
         lastUpdate = nowMillis + 1000;
 
         driftSamples++;
-        
-        if (driftSamples>0)
+
+        if (driftSamples > 0)
         {
-        dX += (newX - lastX);
-        //        dY += (newY - lastY);
-        //        dZ += (newZ - lastZ);
+          dX += (newX - lastX);
+          //        dY += (newY - lastY);
+          //        dZ += (newZ - lastZ);
         }
         lastX = newX;
         //        lastY = newY;
@@ -448,12 +448,13 @@ void loop()
         DEBUG_PRINT("\t\t");
 
         DEBUG_PRINTLN(dX / (float)driftSamples  );
-        
-        Serial.print("D\t");
-        Serial.print(dX / (float)driftSamples);
-        Serial.print("\t");
-        Serial.println(xDriftComp);
-        
+        if (outputMode == UI)
+        {
+          Serial.print("D\t");
+          Serial.print(dX / (float)driftSamples);
+          Serial.print("\t");
+          Serial.println(xDriftComp);
+        }
         //        DEBUG_PRINT("\t\t");
         //        DEBUG_PRINT(dY / (float)driftSamples );
         //        DEBUG_PRINT("\t\t");
@@ -493,10 +494,10 @@ void parseInput()
 
       Serial.print("M\tDrift Compensation");
       Serial.println(xDriftComp);
-      
+
       Serial.print("M\tCurrent Drift Rate ");
-      Serial.println((dX/(float)driftSamples));
-      
+      Serial.println((dX / (float)driftSamples));
+
       Serial.print("M\tGyro Bias ");
       Serial.print(gBias[0]); Serial.print(" / ");
       Serial.print(gBias[1]); Serial.print(" / ");
@@ -523,11 +524,11 @@ void parseInput()
       //recalibrate offsets
       recenter();
     }
-     else if (command == 'D')
+    else if (command == 'D')
     {
       //Save Drift offset
-      xDriftComp =(dX/(float)driftSamples)+ xDriftComp;
-      writeIntEE(EE_XDRIFTCOMP,(int)(xDriftComp*10000.0));
+      xDriftComp = (dX / (float)driftSamples) + xDriftComp;
+      writeIntEE(EE_XDRIFTCOMP, (int)(xDriftComp * 10000.0));
       Serial.print("M\tSaved Drift Comp ");
       Serial.println(xDriftComp);
       Serial.print("R\t");
@@ -634,15 +635,15 @@ void loadBiases() {
   //dmp_set_gyro_bias(gBias); <- all sorts of undocumented shit
   //dmp_set_accel_bias(aBias);
   // physical values stored in Q16:16 format so...9
-  for (int i=0;i<3;i++)
+  for (int i = 0; i < 3; i++)
   {
-    gBias[i] = (long)(gBias[i] * 32.8)>>16;
-    aBias[i] = (long)(aBias[i] * 4096)>>16;
+    gBias[i] = (long)(gBias[i] * 32.8) >> 16;
+    aBias[i] = (long)(aBias[i] * 4096) >> 16;
   }
-    
+
   mpu_set_gyro_bias_reg(gBias);
   mpu_set_accel_bias_6050_reg(aBias);
-  
+
   return ;
 }
 
