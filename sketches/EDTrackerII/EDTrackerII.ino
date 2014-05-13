@@ -7,6 +7,7 @@ const char* PROGMEM infoString = "EDTrackerII V2.0";
 //
 // Changelog:
 // 2014-05-05 Migrate V1 Head Tracker to new port of Invensense libs
+// 2014-05-13 Remove dodgy comment line. Move bias values away from user editable section
 //
 
 /* ============================================
@@ -38,13 +39,6 @@ THE SOFTWARE.
 // smaller movements near the centre, larger at the edges
 //#define EXPONENTIAL
 
-////////////////  Plug in your drift compensaion value here:  \\\\\\\\\\\\\\
-float xDriftComp = 0.0;
-//float yDriftComp = 0.0;
-//float zDriftComp = 0.0;
-
-boolean swapPitchAxis = false;
-
 #ifdef EXPONENTIAL
 float xScale = 8.0;
 float yScale = 8.0;
@@ -54,6 +48,16 @@ float xScale = 3.0;
 float yScale = 3.0;
 float zScale = 3.0;
 #endif;
+
+
+
+// No need to edit anymore :)
+float xDriftComp = 0.0;
+//float yDriftComp = 0.0;
+//float zDriftComp = 0.0;
+
+boolean swapPitchAxis = false;
+
 
 #define POLLMPU
 
