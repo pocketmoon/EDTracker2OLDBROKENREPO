@@ -50,15 +50,15 @@
 #define INV_WXYZ_QUAT       (0x100)
 
 /* Set up functions. */
-uint8_t dmp_load_motion_driver_firmware(void);
-uint8_t dmp_set_fifo_rate(unsigned short rate);
-uint8_t dmp_get_fifo_rate(unsigned short *rate);
-uint8_t dmp_enable_feature(unsigned short mask);
-uint8_t dmp_get_enabled_features(unsigned short *mask);
-uint8_t dmp_set_interrupt_mode(unsigned char mode);
-uint8_t dmp_set_orientation(unsigned short orient);
-uint8_t dmp_set_gyro_bias(long *bias);
-uint8_t dmp_set_accel_bias(long *bias);
+void dmp_load_motion_driver_firmware(void);
+void dmp_set_fifo_rate(unsigned short rate);
+void dmp_get_fifo_rate(unsigned short *rate);
+void dmp_enable_feature(unsigned short mask);
+void dmp_get_enabled_features(unsigned short *mask);
+void dmp_set_interrupt_mode(unsigned char mode);
+void dmp_set_orientation(unsigned short orient);
+void dmp_set_gyro_bias(long *bias);
+void dmp_set_accel_bias(long *bias);
 
 /* Tap functions. */
 uint8_t dmp_register_tap_cb(void (*func)(unsigned char, unsigned char));
@@ -80,12 +80,12 @@ uint8_t dmp_enable_6x_lp_quat(unsigned char enable);
 
 
 /* DMP gyro calibration functions. */
-uint8_t dmp_enable_gyro_cal(unsigned char enable);
+void dmp_enable_gyro_cal(unsigned char enable);
 
 /* Read function. This function should be called whenever the MPU interrupt is
  * detected.
  */
-uint8_t dmp_read_fifo(short *gyro, short *accel, long *quat,
+void  dmp_read_fifo(short *gyro, short *accel, long *quat,
     unsigned long *timestamp, short *sensors, unsigned char *more);
 
 #endif  /* #ifndef _INV_MPU_DMP_MOTION_DRIVER_H_ */

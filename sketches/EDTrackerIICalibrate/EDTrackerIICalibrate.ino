@@ -71,7 +71,7 @@ extern "C" {
 
 bool outputMode = true;
 
-long gBias[3], aBias[3];
+long gBias[3], aBias[3], fBias[3];
 
 /* EEPROM Offsets for config and calibration stuff*/
 #define EE_VERSION 0
@@ -128,8 +128,11 @@ void setup() {
   // Accel sensitivity:     2g
   // Gyro Low-pass filter:  42Hz
   // DMP Update rate:       100Hz
-  loadBiases();
   initialize_mpu() ;
+  //grab the factory bias values 
+  mpu_read_6050_accel_bias(fBias);  
+  
+  loadBiases();
    mpu_set_dmp_state(1);
   //mpu_get_biases
 //  enable_mpu();
@@ -169,25 +172,13 @@ void loop()
     digitalWrite(LED_PIN, blinkState);
   }
 
-  int success = dmp_read_fifo(gyro, accel, quat, &sensor_timestamp, &sensors, &more);
+// libs chopped so timestamp not returned
+  dmp_read_fifo(gyro, accel, quat, &sensor_timestamp, &sensors, &more);
 
   if (outputMode)
   {
     Serial.print("0.0\t0.0\t0.0\t");
-
-    //    Serial.print(accel[0] ); //
-    //    Serial.print("\t");
-    //    Serial.print(accel[1]); // Pitch
-    //    Serial.print("\t");
-    //    Serial.print(accel[2] ); // Roll
-    //    Serial.print("\t");
     tripple(accel);
-
-    //    Serial.print(gyro[0]); // Yaw
-    //    Serial.print("\t");
-    //    Serial.print(gyro[1] ); // Pitch
-    //    Serial.print("\t");
-    //    Serial.println(gyro[2]); // Roll
     tripple(gyro);
     Serial.println("");
   }
@@ -279,7 +270,7 @@ void  initialize_mpu() {
 void update_bias()
 {
   long gyroSum[3], accelSum[3];
-  int samples = 10;
+  int samples = 7;
   unsigned short i;
 
   for (i = 0; i < 3; i++)
@@ -287,6 +278,10 @@ void update_bias()
     gyroSum[i] = 0;
     accelSum[i] = 0;
   }
+
+  // set gyro to zero and accel to factory bias
+  mpu_set_gyro_bias_reg(gyroSum);
+  mpu_set_accel_bias_6050_reg(fBias,false);
 
   Serial.println("M\t Sampling...");
   //Serial.println(samples);
@@ -312,6 +307,13 @@ void update_bias()
     aBias[i] = (long)(((float)accelSum[i])/(float)samples);
   }
 
+  for ( i = 0; i < 3; i++)
+  {
+    gBias[i] = (long)(gBias[i] * 32.8) >> 16;
+    aBias[i] = (long)(aBias[i] * 2048) >> 16;
+  }
+
+
   mess("M\tGyro Bias ", gBias);
   mess("M\tAccel Bias ", aBias);
 
@@ -321,30 +323,18 @@ void update_bias()
 //  int add = EE_XGYRO;
 //  int add2 = EE_XACCEL;
   
-//  for ( i=0;i<3;i++)
-//  {
-//    writeLongEE (EE_XGYRO +i*4, gBias[i]);
-//    writeLongEE (EE_XACCEL+i*4, aBias[i]);
-//  }
-    
-  writeLongEE (EE_XGYRO, gBias[0]);
-  writeLongEE (EE_YGYRO, gBias[1]);
-  writeLongEE (EE_ZGYRO, gBias[2]);
-  writeLongEE (EE_XACCEL, aBias[0]);
-  writeLongEE (EE_YACCEL, aBias[1]);
-  writeLongEE (EE_ZACCEL, aBias[2]);
-  
+  for ( i=0;i<3;i++)
+  {
+    writeLongEE (EE_XGYRO +i*4, gBias[i]);
+    writeLongEE (EE_XACCEL+i*4, aBias[i]);
+  }
+   
+ loadBiases(); 
   return;
 }
 
 void tripple(short *v)
 {
-  //    Serial.print(v[0] ); //
-  //    Serial.print("\t");
-  //    Serial.print(v[1]); // Pitch
-  //    Serial.print("\t");
-  //    Serial.print(v[2] ); // Roll
-  //    Serial.print("\t");
   for (int i = 0; i < 3; i++)
   {
     Serial.print(v[i] ); //
@@ -360,23 +350,18 @@ void mess(char *m, long*v)
   Serial.println(v[2]);
 }
 
-
 void loadBiases() {
   
   //int add = ;
-//  for (int i=0;i < 3;i++)
-//  {
-//    gBias[i] = readLongEE (EE_XGYRO  + i*4);
-//    aBias[i] = readLongEE (EE_XACCEL + i*4);
-//  }
-  
-    gBias[0] = readLongEE (EE_XGYRO);
-  gBias[1] = readLongEE (EE_YGYRO);
-  gBias[2] = readLongEE (EE_ZGYRO);
+  mpu_set_accel_bias_6050_reg(fBias,false);
 
-  aBias[0] = readLongEE (EE_XACCEL);
-  aBias[1] = readLongEE (EE_YACCEL);
-  aBias[2] = readLongEE (EE_ZACCEL);
+  for (int i=0;i < 3;i++)
+  {
+    gBias[i] = readLongEE (EE_XGYRO  + i*4);
+    aBias[i] = readLongEE (EE_XACCEL + i*4);
+  }
   
+  mpu_set_gyro_bias_reg(gBias);
+  mpu_set_accel_bias_6050_reg(aBias,true);
   return ;
 }

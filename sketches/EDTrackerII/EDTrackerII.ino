@@ -8,6 +8,7 @@ const char* PROGMEM infoString = "EDTrackerII V2.0";
 // Changelog:
 // 2014-05-05 Migrate V1 Head Tracker to new port of Invensense libs
 // 2014-05-13 Remove dodgy comment line. Move bias values away from user editable section
+// 2014-05-16 Stuff
 //
 
 /* ============================================
@@ -39,27 +40,18 @@ THE SOFTWARE.
 // smaller movements near the centre, larger at the edges
 //#define EXPONENTIAL
 
+
 #ifdef EXPONENTIAL
-float xScale = 8.0;
-float yScale = 8.0;
-float zScale = 8.0;
+float xScale = 20.0;
+float yScale = 20.0;
+float zScale = 20.0;
 #else // standard linear response
-float xScale = 3.0;
-float yScale = 3.0;
-float zScale = 3.0;
+float xScale = 3.5;
+float yScale = 3.5;
+float zScale = 3.5;
 #endif;
 
-
-
-// No need to edit anymore :)
-float xDriftComp = 0.0;
-//float yDriftComp = 0.0;
-//float zDriftComp = 0.0;
-
-boolean swapPitchAxis = false;
-
-
-#define POLLMPU
+#define POLLMPUv
 
 #define EMPL_TARGET_ATMEGA328
 
@@ -82,6 +74,12 @@ extern "C" {
 #include <inv_mpu.h>
 #include <inv_mpu_dmp_motion_driver.h>
 }
+
+float xDriftComp = 0.0;
+//float yDriftComp = 0.0;
+//float zDriftComp = 0.0;
+
+
 
 /* EEPROM Offsets for config and calibration stuff*/
 #define EE_VERSION 0
@@ -187,7 +185,7 @@ long readLongEE(int address) {
 void setup() {
 
   Serial.begin(115200);
-  delay(500);
+  delay(5000);
 
 #ifdef DEBUG
   outputMode = UI;
@@ -248,12 +246,6 @@ void setup() {
 ****************************************/
 unsigned long sensor_timestamp;
 
-
-/***************************************
-* Invensense Hardware Abstracation Layer
-***************************************/
-unsigned char dmp_on;
-
 /* Starting sampling rate. */
 #define DEFAULT_MPU_HZ    (100)
 
@@ -274,7 +266,7 @@ void recenter()
 //unsigned char accel_fsr;  // accelerometer full-scale rate, in +/- Gs (possible values are 2, 4, 8 or 16).  Default:  2
 //unsigned short dmp_update_rate; // update rate, in hZ (possible values are between 4 and 1000).  Default:  100
 //unsigned short gyro_fsr;  // Gyro full-scale_rate, in +/- degrees/sec, possible values are 250, 500, 1000 or 2000.  Default:  2000
-
+boolean new_gyro ,dmp_on;
 void loop()
 {
 
@@ -285,22 +277,22 @@ void loop()
   // If the MPU Interrupt occurred, read the fifo and process the data
 
 #ifdef POLLMPU
-  if (true)    //(hal.new_gyro && hal.dmp_on)
+  if (true)    //new_gyro && hal.dmp_on)
 #else
-  if (hal.new_gyro && hal.dmp_on)
+  if (new_gyro && dmp_on)
 #endif
   {
     short gyro[3], accel[3], sensors;
     unsigned char more = 0;
     long quat[4];
-
-    int success = dmp_read_fifo(gyro, accel, quat, &sensor_timestamp, &sensors, &more);
+    sensor_timestamp = 1;
+    dmp_read_fifo(gyro, accel, quat, &sensor_timestamp, &sensors, &more);
 
     //
-    //    if (!more)
-    //      hal.new_gyro = 0;
-
-    if ( success == 0 )
+      if (!more)
+          new_gyro = 0;
+          
+if (sensor_timestamp == 0)
     {
       Quaternion q( (float)(quat[0] >> 16) / 16384.0f,
                     (float)(quat[1] >> 16) / 16384.0f,
@@ -548,12 +540,12 @@ void parseInput()
  * ISR context. In this example, it sets a flag protecting the FIFO read
  * function.
  */
-//void gyro_data_ready_cb(void) {
-//  hal.new_gyro = 1;
-//}
+void gyro_data_ready_cb(void) {
+  new_gyro = 1;
+}
 #ifndef POLLMPU
 ISR(INT6_vect) {
-  hal.new_gyro = 1;
+  new_gyro = 1;
 }
 #endif
 
@@ -561,12 +553,7 @@ ISR(INT6_vect) {
 boolean initialize_mpu() {
   int result;
 
-  result = mpu_init();
-
-  if ( result != 0 ) {
-    DEBUG_PRINT("mpu_init failed!");
-    return false;
-  }
+  mpu_init();
 
   /* Get/set hardware configuration. Start gyro. */
   /* Wake up all sensors. */
@@ -582,13 +569,8 @@ boolean initialize_mpu() {
    * 5. Call dmp_set_fifo_rate(freq) to select a DMP output rate.
    */
 
-  result = dmp_load_motion_driver_firmware();
-  if ( result != 0 ) {
-    DEBUG_PRINT("Firmware Load ERROR ");
-    DEBUG_PRINTLN(result);
-    return false;
-  }
-
+  dmp_load_motion_driver_firmware();
+  
   DEBUG_PRINTLN("Firmware Loaded ");
 
   dmp_set_orientation(gyro_orients[orientation]);
@@ -638,15 +620,9 @@ void loadBiases() {
 
   //dmp_set_gyro_bias(gBias); <- all sorts of undocumented shit
   //dmp_set_accel_bias(aBias);
-  // physical values stored in Q16:16 format so...9
-  for (int i = 0; i < 3; i++)
-  {
-    gBias[i] = (long)(gBias[i] * 32.8) >> 16;
-    aBias[i] = (long)(aBias[i] * 4096) >> 16;
-  }
 
   mpu_set_gyro_bias_reg(gBias);
-  mpu_set_accel_bias_6050_reg(aBias);
+  mpu_set_accel_bias_6050_reg(aBias,true);
 
   return ;
 }

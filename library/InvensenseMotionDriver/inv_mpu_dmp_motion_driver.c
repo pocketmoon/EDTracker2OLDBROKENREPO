@@ -505,9 +505,9 @@ static struct dmp_s dmp = {
  *  @brief  Load the DMP with this image.
  *  @return 0 if successful.
  */
-uint8_t dmp_load_motion_driver_firmware(void)
+void dmp_load_motion_driver_firmware(void)
 {
-    return mpu_load_firmware(DMP_CODE_SIZE, dmp_memory, sStartAddress,
+     mpu_load_firmware(DMP_CODE_SIZE, dmp_memory, sStartAddress,
         DMP_SAMPLE_RATE);
 }
 
@@ -518,7 +518,7 @@ uint8_t dmp_load_motion_driver_firmware(void)
  *  @param[in]  orient  Gyro and accel orientation in body frame.
  *  @return     0 if successful.
  */
-uint8_t dmp_set_orientation(unsigned short orient)
+void dmp_set_orientation(unsigned short orient)
 {
     unsigned char gyro_regs[3], accel_regs[3];
     const unsigned char gyro_axes[3] = {DINA4C, DINACD, DINA6C};
@@ -529,18 +529,18 @@ uint8_t dmp_set_orientation(unsigned short orient)
     gyro_regs[0] = gyro_axes[orient & 3];
     gyro_regs[1] = gyro_axes[(orient >> 3) & 3];
     gyro_regs[2] = gyro_axes[(orient >> 6) & 3];
+	
     accel_regs[0] = accel_axes[orient & 3];
     accel_regs[1] = accel_axes[(orient >> 3) & 3];
     accel_regs[2] = accel_axes[(orient >> 6) & 3];
 
     /* Chip-to-body, axes only. */
-    if (mpu_write_mem(FCFG_1, 3, gyro_regs))
-        return -1;
-    if (mpu_write_mem(FCFG_2, 3, accel_regs))
-        return -1;
+    mpu_write_mem(FCFG_1, 3, gyro_regs);
+    mpu_write_mem(FCFG_2, 3, accel_regs);
 
     memcpy(gyro_regs, gyro_sign, 3);
     memcpy(accel_regs, accel_sign, 3);
+	
     if (orient & 4) {
         gyro_regs[0] |= 1;
         accel_regs[0] |= 1;
@@ -555,12 +555,10 @@ uint8_t dmp_set_orientation(unsigned short orient)
     }
 
     /* Chip-to-body, sign only. */
-    if (mpu_write_mem(FCFG_3, 3, gyro_regs))
-        return -1;
-    if (mpu_write_mem(FCFG_7, 3, accel_regs))
-        return -1;
+    mpu_write_mem(FCFG_3, 3, gyro_regs);
+    mpu_write_mem(FCFG_7, 3, accel_regs);
     dmp.orient = orient;
-    return 0;
+    return ;
 }
 
 /**
@@ -573,7 +571,7 @@ uint8_t dmp_set_orientation(unsigned short orient)
  *  @param[in]  bias    Gyro biases in q16.
  *  @return     0 if successful.
  */
-uint8_t dmp_set_gyro_bias(long *bias)
+void  dmp_set_gyro_bias(long *bias)
 {
     long gyro_bias_body[3];
     unsigned char regs[4];
@@ -602,21 +600,21 @@ uint8_t dmp_set_gyro_bias(long *bias)
     regs[1] = (unsigned char)((gyro_bias_body[0] >> 16) & 0xFF);
     regs[2] = (unsigned char)((gyro_bias_body[0] >> 8) & 0xFF);
     regs[3] = (unsigned char)(gyro_bias_body[0] & 0xFF);
-    if (mpu_write_mem(D_EXT_GYRO_BIAS_X, 4, regs))
-        return -1;
-
+    mpu_write_mem(D_EXT_GYRO_BIAS_X, 4, regs);
+    
     regs[0] = (unsigned char)((gyro_bias_body[1] >> 24) & 0xFF);
     regs[1] = (unsigned char)((gyro_bias_body[1] >> 16) & 0xFF);
     regs[2] = (unsigned char)((gyro_bias_body[1] >> 8) & 0xFF);
     regs[3] = (unsigned char)(gyro_bias_body[1] & 0xFF);
-    if (mpu_write_mem(D_EXT_GYRO_BIAS_Y, 4, regs))
-        return -1;
+    mpu_write_mem(D_EXT_GYRO_BIAS_Y, 4, regs);
 
     regs[0] = (unsigned char)((gyro_bias_body[2] >> 24) & 0xFF);
     regs[1] = (unsigned char)((gyro_bias_body[2] >> 16) & 0xFF);
     regs[2] = (unsigned char)((gyro_bias_body[2] >> 8) & 0xFF);
     regs[3] = (unsigned char)(gyro_bias_body[2] & 0xFF);
-    return mpu_write_mem(D_EXT_GYRO_BIAS_Z, 4, regs);
+    mpu_write_mem(D_EXT_GYRO_BIAS_Z, 4, regs);
+	
+	return;
 }
 
 /**
@@ -625,7 +623,7 @@ uint8_t dmp_set_gyro_bias(long *bias)
  *  @param[in]  bias    Accel biases in q16.
  *  @return     0 if successful.
  */
-uint8_t dmp_set_accel_bias(long *bias)
+void dmp_set_accel_bias(long *bias)
 {
     long accel_bias_body[3];
     unsigned char regs[12];
@@ -668,7 +666,9 @@ uint8_t dmp_set_accel_bias(long *bias)
     regs[9] = (unsigned char)((accel_bias_body[2] >> 16) & 0xFF);
     regs[10] = (unsigned char)((accel_bias_body[2] >> 8) & 0xFF);
     regs[11] = (unsigned char)(accel_bias_body[2] & 0xFF);
-    return mpu_write_mem(D_ACCEL_BIAS, 12, regs);
+     mpu_write_mem(D_ACCEL_BIAS, 12, regs);
+	 
+	 return;
 }
 
 /**
@@ -677,7 +677,7 @@ uint8_t dmp_set_accel_bias(long *bias)
  *  @param[in]  rate    Desired fifo rate (Hz).
  *  @return     0 if successful.
  */
-uint8_t dmp_set_fifo_rate(unsigned short rate)
+void  dmp_set_fifo_rate(unsigned short rate)
 {
     const unsigned char regs_end[12] = {DINAFE, DINAF2, DINAAB,
         0xc4, DINAAA, DINAF1, DINADF, DINADF, 0xBB, 0xAF, DINADF, DINADF};
@@ -689,13 +689,11 @@ uint8_t dmp_set_fifo_rate(unsigned short rate)
     div = DMP_SAMPLE_RATE / rate - 1;
     tmp[0] = (unsigned char)((div >> 8) & 0xFF);
     tmp[1] = (unsigned char)(div & 0xFF);
-    if (mpu_write_mem(D_0_22, 2, tmp))
-        return -1;
-    if (mpu_write_mem(CFG_6, 12, (unsigned char*)regs_end))
-        return -1;
-
+    mpu_write_mem(D_0_22, 2, tmp);
+	
+    mpu_write_mem(CFG_6, 12, (unsigned char*)regs_end);
     dmp.fifo_rate = rate;
-    return 0;
+    return;
 }
 
 /**
@@ -703,10 +701,10 @@ uint8_t dmp_set_fifo_rate(unsigned short rate)
  *  @param[out] rate    Current fifo rate (Hz).
  *  @return     0 if successful.
  */
-uint8_t dmp_get_fifo_rate(unsigned short *rate)
+void  dmp_get_fifo_rate(unsigned short *rate)
 {
     rate[0] = dmp.fifo_rate;
-    return 0;
+    return ;
 }
 
 /**
@@ -756,22 +754,16 @@ uint8_t dmp_set_tap_thresh(unsigned char axis, unsigned short thresh)
     tmp[3] = (unsigned char)(dmp_thresh_2 & 0xFF);
 
     if (axis & TAP_X) {
-        if (mpu_write_mem(DMP_TAP_THX, 2, tmp))
-            return -1;
-        if (mpu_write_mem(D_1_36, 2, tmp+2))
-            return -1;
+        mpu_write_mem(DMP_TAP_THX, 2, tmp);
+        mpu_write_mem(D_1_36, 2, tmp+2);        
     }
     if (axis & TAP_Y) {
-        if (mpu_write_mem(DMP_TAP_THY, 2, tmp))
-            return -1;
-        if (mpu_write_mem(D_1_40, 2, tmp+2))
-            return -1;
+        mpu_write_mem(DMP_TAP_THY, 2, tmp);
+        mpu_write_mem(D_1_40, 2, tmp+2);
     }
     if (axis & TAP_Z) {
-        if (mpu_write_mem(DMP_TAP_THZ, 2, tmp))
-            return -1;
-        if (mpu_write_mem(D_1_44, 2, tmp+2))
-            return -1;
+        mpu_write_mem(DMP_TAP_THZ, 2, tmp);
+		mpu_write_mem(D_1_44, 2, tmp+2);
     }
     return 0;
 }
@@ -791,7 +783,8 @@ uint8_t dmp_set_tap_axes(unsigned char axis)
         tmp |= 0x0C;
     if (axis & TAP_Z)
         tmp |= 0x03;
-    return mpu_write_mem(D_1_72, 1, &tmp);
+    mpu_write_mem(D_1_72, 1, &tmp);
+	return 0;
 }
 
 /**
@@ -809,7 +802,8 @@ uint8_t dmp_set_tap_count(unsigned char min_taps)
         min_taps = 4;
 
     tmp = min_taps - 1;
-    return mpu_write_mem(D_1_79, 1, &tmp);
+     mpu_write_mem(D_1_79, 1, &tmp);
+	 return 0;
 }
 
 /**
@@ -825,7 +819,8 @@ uint8_t dmp_set_tap_time(unsigned short time)
     dmp_time = time / (1000 / DMP_SAMPLE_RATE);
     tmp[0] = (unsigned char)(dmp_time >> 8);
     tmp[1] = (unsigned char)(dmp_time & 0xFF);
-    return mpu_write_mem(DMP_TAPW_MIN, 2, tmp);
+     mpu_write_mem(DMP_TAPW_MIN, 2, tmp);
+	 return 0;
 }
 
 /**
@@ -841,7 +836,8 @@ uint8_t dmp_set_tap_time_multi(unsigned short time)
     dmp_time = time / (1000 / DMP_SAMPLE_RATE);
     tmp[0] = (unsigned char)(dmp_time >> 8);
     tmp[1] = (unsigned char)(dmp_time & 0xFF);
-    return mpu_write_mem(D_1_218, 2, tmp);
+     mpu_write_mem(D_1_218, 2, tmp);
+	 return 0;
 }
 
 /**
@@ -859,7 +855,8 @@ uint8_t dmp_set_shake_reject_thresh(long sf, unsigned short thresh)
     tmp[1] = (unsigned char)(((long)thresh_scaled >> 16) & 0xFF);
     tmp[2] = (unsigned char)(((long)thresh_scaled >> 8) & 0xFF);
     tmp[3] = (unsigned char)((long)thresh_scaled & 0xFF);
-    return mpu_write_mem(D_1_92, 4, tmp);
+     mpu_write_mem(D_1_92, 4, tmp);
+	 return 0;
 }
 
 /**
@@ -877,7 +874,8 @@ uint8_t dmp_set_shake_reject_time(unsigned short time)
     time /= (1000 / DMP_SAMPLE_RATE);
     tmp[0] = time >> 8;
     tmp[1] = time & 0xFF;
-    return mpu_write_mem(D_1_90,2,tmp);
+     mpu_write_mem(D_1_90,2,tmp);
+	 return 0;
 }
 
 /**
@@ -895,7 +893,8 @@ uint8_t dmp_set_shake_reject_timeout(unsigned short time)
     time /= (1000 / DMP_SAMPLE_RATE);
     tmp[0] = time >> 8;
     tmp[1] = time & 0xFF;
-    return mpu_write_mem(D_1_88,2,tmp);
+     mpu_write_mem(D_1_88,2,tmp);
+	 return 0;
 }
 
 
@@ -917,7 +916,7 @@ uint8_t dmp_set_shake_reject_timeout(unsigned short time)
  *  @param[in]  mask    Mask of features to enable.
  *  @return     0 if successful.
  */
-uint8_t dmp_enable_feature(unsigned short mask)
+void dmp_enable_feature(unsigned short mask)
 {
     unsigned char tmp[10];
 
@@ -1031,7 +1030,7 @@ uint8_t dmp_enable_feature(unsigned short mask)
     if (mask & (DMP_FEATURE_TAP | DMP_FEATURE_ANDROID_ORIENT))
         dmp.packet_length += 4;
 
-    return 0;
+    return ;
 }
 
 /**
@@ -1039,10 +1038,10 @@ uint8_t dmp_enable_feature(unsigned short mask)
  *  @param[out] Mask of enabled features.
  *  @return     0 if successful.
  */
-uint8_t dmp_get_enabled_features(unsigned short *mask)
+void  dmp_get_enabled_features(unsigned short *mask)
 {
     mask[0] = dmp.feature_mask;
-    return 0;
+    return ;
 }
 
 /**
@@ -1054,14 +1053,14 @@ uint8_t dmp_get_enabled_features(unsigned short *mask)
  *  @param[in]  enable  1 to enable gyro calibration.
  *  @return     0 if successful.
  */
-uint8_t dmp_enable_gyro_cal(unsigned char enable)
+void  dmp_enable_gyro_cal(unsigned char enable)
 {
     if (enable) {
         unsigned char regs[9] = {0xb8, 0xaa, 0xb3, 0x8d, 0xb4, 0x98, 0x0d, 0x35, 0x5d};
-        return mpu_write_mem(CFG_MOTION_BIAS, 9, regs);
+         mpu_write_mem(CFG_MOTION_BIAS, 9, regs);
     } else {
         unsigned char regs[9] = {0xb8, 0xaa, 0xaa, 0xaa, 0xb0, 0x88, 0xc3, 0xc5, 0xc7};
-        return mpu_write_mem(CFG_MOTION_BIAS, 9, regs);
+         mpu_write_mem(CFG_MOTION_BIAS, 9, regs);
     }
 }
 
@@ -1121,7 +1120,7 @@ uint8_t dmp_enable_6x_lp_quat(unsigned char enable)
  *  @param[in]  mode    DMP_INT_GESTURE or DMP_INT_CONTINUOUS.
  *  @return     0 if successful.
  */
-uint8_t dmp_set_interrupt_mode(unsigned char mode)
+void dmp_set_interrupt_mode(unsigned char mode)
 {
     const unsigned char regs_continuous[11] =
         {0xd8, 0xb1, 0xb9, 0xf3, 0x8b, 0xa3, 0x91, 0xb6, 0x09, 0xb4, 0xd9};
@@ -1130,13 +1129,13 @@ uint8_t dmp_set_interrupt_mode(unsigned char mode)
 
     switch (mode) {
     case DMP_INT_CONTINUOUS:
-        return mpu_write_mem(CFG_FIFO_ON_EVENT, 11,
+         mpu_write_mem(CFG_FIFO_ON_EVENT, 11,
             (unsigned char*)regs_continuous);
     case DMP_INT_GESTURE:
-        return mpu_write_mem(CFG_FIFO_ON_EVENT, 11,
+         mpu_write_mem(CFG_FIFO_ON_EVENT, 11,
             (unsigned char*)regs_gesture);
     default:
-        return -1;
+        return ;
     }
 }
 
@@ -1161,7 +1160,7 @@ uint8_t dmp_set_interrupt_mode(unsigned char mode)
   *  @return     0 if successful.  Negative if error:  -1:  DMP Not On; -2:  I2C read error; -3:  Fifo Overflow -4: No Sensors -5: No more data available
  -6:  Quaternion out of range (I2C corruption?)
  */
-uint8_t dmp_read_fifo(short *gyro, short *accel, long *quat,
+void  dmp_read_fifo(short *gyro, short *accel, long *quat,
     unsigned long *timestamp, short *sensors, unsigned char *more)
 {
     unsigned char fifo_data[MAX_PACKET_LENGTH];
@@ -1174,68 +1173,60 @@ uint8_t dmp_read_fifo(short *gyro, short *accel, long *quat,
 
     /* Get a packet. */
     int success = mpu_read_fifo_stream(dmp.packet_length, fifo_data, more);
+	
 	if ( success != 0 ) return success;
-
+	
+	int i;
+		
     /* Parse DMP packet. */
     if (dmp.feature_mask & (DMP_FEATURE_LP_QUAT | DMP_FEATURE_6X_LP_QUAT)) {
-#ifdef FIFO_CORRUPTION_CHECK
-        long quat_q14[4], quat_mag_sq;
-#endif
+		for (i=0;i<4;i++)
+		quat[i] = ((long)fifo_data[i*4] << 24) | ((long)fifo_data[i*4+1] << 16) |
+            ((long)fifo_data[i*4+2] << 8) | fifo_data[i*4+3];
+/*
         quat[0] = ((long)fifo_data[0] << 24) | ((long)fifo_data[1] << 16) |
             ((long)fifo_data[2] << 8) | fifo_data[3];
+			
         quat[1] = ((long)fifo_data[4] << 24) | ((long)fifo_data[5] << 16) |
             ((long)fifo_data[6] << 8) | fifo_data[7];
+			
         quat[2] = ((long)fifo_data[8] << 24) | ((long)fifo_data[9] << 16) |
             ((long)fifo_data[10] << 8) | fifo_data[11];
+			
         quat[3] = ((long)fifo_data[12] << 24) | ((long)fifo_data[13] << 16) |
             ((long)fifo_data[14] << 8) | fifo_data[15];
+			*/
+			
         ii += 16;
-#ifdef FIFO_CORRUPTION_CHECK
-        /* We can detect a corrupted FIFO by monitoring the quaternion data and
-         * ensuring that the magnitude is always normalized to one. This
-         * shouldn't happen in normal operation, but if an I2C error occurs,
-         * the FIFO reads might become misaligned.
-         *
-         * Let's start by scaling down the quaternion data to avoid long long
-         * math.
-         */
-        quat_q14[0] = quat[0] >> 16;
-        quat_q14[1] = quat[1] >> 16;
-        quat_q14[2] = quat[2] >> 16;
-        quat_q14[3] = quat[3] >> 16;
-        quat_mag_sq = quat_q14[0] * quat_q14[0] + quat_q14[1] * quat_q14[1] +
-            quat_q14[2] * quat_q14[2] + quat_q14[3] * quat_q14[3];
-        if ((quat_mag_sq < QUAT_MAG_SQ_MIN) ||
-            (quat_mag_sq > QUAT_MAG_SQ_MAX)) {
-            /* Quaternion is outside of the acceptable threshold. */
-            mpu_reset_fifo();
-            sensors[0] = 0;
-            return -4;
-        }
-        sensors[0] |= INV_WXYZ_QUAT;
-#endif
     }
 
+	
     if (dmp.feature_mask & DMP_FEATURE_SEND_RAW_ACCEL) {
+	  for (i=0;i<3;i++)
+	    accel[i] = ((short)fifo_data[ii+i*2] << 8) | fifo_data[ii+i*2+1];
+		/*
         accel[0] = ((short)fifo_data[ii+0] << 8) | fifo_data[ii+1];
         accel[1] = ((short)fifo_data[ii+2] << 8) | fifo_data[ii+3];
         accel[2] = ((short)fifo_data[ii+4] << 8) | fifo_data[ii+5];
+		*/
         ii += 6;
         sensors[0] |= INV_XYZ_ACCEL;
     }
 
     if (dmp.feature_mask & DMP_FEATURE_SEND_ANY_GYRO) {
+	  for (i=0;i<3;i++)
+	     gyro[i] = ((short)fifo_data[ii+i*2] << 8) | fifo_data[ii+i*2+1];
+/*
         gyro[0] = ((short)fifo_data[ii+0] << 8) | fifo_data[ii+1];
         gyro[1] = ((short)fifo_data[ii+2] << 8) | fifo_data[ii+3];
         gyro[2] = ((short)fifo_data[ii+4] << 8) | fifo_data[ii+5];
+		*/
         ii += 6;
         sensors[0] |= INV_XYZ_GYRO;
     }
-
-  
-
-    get_ms(timestamp);
-    return 0;
+*timestamp = 0;
+    //get_ms(timestamp);
+    return ;
 }
 
 

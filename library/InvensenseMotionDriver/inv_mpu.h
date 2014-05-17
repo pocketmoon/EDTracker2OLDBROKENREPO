@@ -60,7 +60,7 @@ struct int_param_s {
 #define MPU_INT_STATUS_DMP_5            (0x2000)
 
 /* Set up APIs */
-uint8_t mpu_init();
+void  mpu_init();
 uint8_t mpu_init_slave(void);
 uint8_t mpu_set_bypass(unsigned char bypass_on);
 void mpu_force_reset();
@@ -72,8 +72,8 @@ uint8_t mpu_lp_motion_interrupt(unsigned short thresh, unsigned char time,
 uint8_t mpu_set_int_level(unsigned char active_low);
 uint8_t mpu_set_int_latched(unsigned char enable);
 
-uint8_t mpu_set_dmp_state(unsigned char enable);
-uint8_t mpu_get_dmp_state(unsigned char *enabled);
+void  mpu_set_dmp_state(unsigned char enable);
+void  mpu_get_dmp_state(unsigned char *enabled);
 
 void mpu_get_lpf(unsigned short *lpf);
 void mpu_set_lpf(unsigned short lpf);
@@ -97,17 +97,17 @@ uint8_t mpu_set_compass_sample_rate(unsigned short rate);
 
 void  mpu_set_gyro_bias_reg(long *gyro_bias);
 
-void  mpu_set_accel_bias_6050_reg(const long *accel_bias); 
+void  mpu_set_accel_bias_6050_reg(const long *accel_bias, unsigned char relative); 
 
-
+void  mpu_read_6050_accel_bias(long *accel_bias);
 
 
 
 uint8_t mpu_get_fifo_config(unsigned char *sensors);
-uint8_t mpu_configure_fifo(unsigned char sensors);
+void mpu_configure_fifo(unsigned char sensors);
 
 uint8_t mpu_get_power_state(unsigned char *power_on);
-uint8_t mpu_set_sensors(unsigned char sensors);
+void mpu_set_sensors(unsigned char sensors);
 
 void  mpu_set_accel_bias(const long *accel_bias);
 
@@ -124,11 +124,11 @@ uint8_t mpu_read_fifo_stream(unsigned short length, unsigned char *data,
     unsigned char *more);
 uint8_t mpu_reset_fifo(void);
 
-uint8_t mpu_write_mem(unsigned short mem_addr, unsigned short length,
+void mpu_write_mem(unsigned short mem_addr, unsigned short length,
     unsigned char *data);
-uint8_t mpu_read_mem(unsigned short mem_addr, unsigned short length,
+void mpu_read_mem(unsigned short mem_addr, unsigned short length,
     unsigned char *data);
-uint8_t mpu_load_firmware(unsigned short length, const unsigned char *firmware,
+void mpu_load_firmware(unsigned short length, const unsigned char *firmware,
     unsigned short start_addr, unsigned short sample_rate);
 
 uint8_t mpu_reg_dump(void);

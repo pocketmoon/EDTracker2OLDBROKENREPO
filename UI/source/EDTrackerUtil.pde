@@ -20,6 +20,9 @@ ToxiclibsSupport gfx;
 float rad2deg = 57.29578;
 float rad2FSR = 10430.06;
 
+float maxGX, maxGY, maxGZ;
+float maxAX, maxAY, maxAZ;
+
 String info = "Unknown Device";
 
 String []messages = {
@@ -70,6 +73,9 @@ void setup() {
 
   background(0);
   textFont(mono);
+  
+  maxGX= maxGY= maxGZ =0.0;
+  maxAX= maxAY= maxAZ =0.0;
 
   frameRate(60);
   mesh=(TriangleMesh)new STLReader().loadBinary(sketchPath("head3.stl"), STLReader.TRIANGLEMESH);
@@ -113,9 +119,9 @@ void setup() {
 
   ellipseMode(CENTER);
 
-  lpX = new iLowPass(80);  //The argument is the FIFO queue length
-  lpY = new iLowPass(80);  //The argument is the FIFO queue length
-  lpZ = new iLowPass(80);  //The argument is the FIFO queue length
+  lpX = new iLowPass(180);  //The argument is the FIFO queue length
+  lpY = new iLowPass(180);  //The argument is the FIFO queue length
+  lpZ = new iLowPass(180);  //The argument is the FIFO queue length
 }
 
 
@@ -164,6 +170,9 @@ void serialEvent(Serial p) {
 
         //yawDriftHist[399]=(yawDrift/(abs(yawDrift)+0.000001))*(sqrt(abs(yawDrift)))*10.0;
         yawDriftHist[399]=yawDrift;
+        
+        //println("A " + maxAX + " " + maxAY + " " + maxAZ + "    G " + maxGX + " " + maxGY + " " + maxGZ); 
+        
       }
       else  if (data[0].equals("R"))
       {
@@ -201,6 +210,18 @@ void serialEvent(Serial p) {
         rawGyroX = int(data[6]);
         rawGyroY = int(data[7]);
         rawGyroZ = int(data[8]);
+        
+        if (abs(rawAccelX) > maxAX)    maxAX = abs(rawAccelX) ;
+        if (abs(rawAccelY) > maxAY)    maxAY = abs(rawAccelY) ;
+        if (abs(rawAccelZ) > maxAZ)    maxAZ = abs(rawAccelZ) ;
+        
+        if (abs(rawGyroX) > maxGX)    maxGX = abs(rawGyroX) ;
+        if (abs(rawGyroY) > maxGY)    maxGY = abs(rawGyroY) ;
+        if (abs(rawGyroZ) > maxGZ)    maxGZ = abs(rawGyroZ) ;
+
+       //  println("A "+maxAX+" "+maxAY+" "+maxAZ+"   G "+maxGX+" "+maxGY+" "+maxGZ); 
+
+          
       }
     }
   } 
@@ -425,6 +446,11 @@ void draw() {
 
   ellipse(670 + constrain (rawAccelX/10, -90, 90), 280 -constrain(rawAccelY/10, -90, 90), 5, 5);
   //  ellipse(670 , 280 , 10, 10);
+  
+   fill(0, 255, 255);
+  stroke(25, 255, 40);
+  ellipse(670 + constrain (rawGyroX, -90, 90), 280 -constrain(rawGyroY, -90, 90), 5, 5);
+
 
 
   fill(255, 255, 255);
