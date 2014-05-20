@@ -2,13 +2,14 @@
 //  Head Tracker Sketch
 //
 
-const char* PROGMEM infoString = "EDTrackerII V2.0";
+const char* PROGMEM infoString = "EDTrackerII V2.3";
 
 //
 // Changelog:
 // 2014-05-05 Migrate V1 Head Tracker to new port of Invensense libs
 // 2014-05-13 Remove dodgy comment line. Move bias values away from user editable section
 // 2014-05-16 Stuff
+// 2014-05-20 Amend version number to keep in line with changes
 //
 
 /* ============================================
