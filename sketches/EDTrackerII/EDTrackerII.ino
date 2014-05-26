@@ -2,7 +2,7 @@
 //  Head Tracker Sketch
 //
 
-const char* PROGMEM infoString = "EDTrackerII V2.3";
+const char* PROGMEM infoString = "EDTrackerII V2.4";
 
 //
 // Changelog:
@@ -10,6 +10,7 @@ const char* PROGMEM infoString = "EDTrackerII V2.3";
 // 2014-05-13 Remove dodgy comment line. Move bias values away from user editable section
 // 2014-05-16 Stuff
 // 2014-05-20 Amend version number to keep in line with changes
+// 2014-05-23 Set Gyro and Accel FSR to keep DMP happy (undocumented req?)
 //
 
 /* ============================================
@@ -41,15 +42,14 @@ THE SOFTWARE.
 // smaller movements near the centre, larger at the edges
 //#define EXPONENTIAL
 
-
 #ifdef EXPONENTIAL
 float xScale = 20.0;
 float yScale = 20.0;
 float zScale = 20.0;
 #else // standard linear response
-float xScale = 3.5;
-float yScale = 3.5;
-float zScale = 3.5;
+float xScale = 4.0;
+float yScale = 4.0;
+float zScale = 4.0;
 #endif;
 
 #define POLLMPUv
@@ -76,11 +76,8 @@ extern "C" {
 #include <inv_mpu_dmp_motion_driver.h>
 }
 
+
 float xDriftComp = 0.0;
-//float yDriftComp = 0.0;
-//float zDriftComp = 0.0;
-
-
 
 /* EEPROM Offsets for config and calibration stuff*/
 #define EE_VERSION 0
@@ -559,6 +556,11 @@ boolean initialize_mpu() {
   /* Get/set hardware configuration. Start gyro. */
   /* Wake up all sensors. */
   mpu_set_sensors(INV_XYZ_GYRO | INV_XYZ_ACCEL);
+  
+  mpu_set_gyro_fsr (2000);
+  mpu_set_accel_fsr(2);
+  mpu_set_lpf(42);   
+  
   /* Push both gyro and accel data into the FIFO. */
   mpu_configure_fifo(INV_XYZ_GYRO | INV_XYZ_ACCEL);
   mpu_set_sample_rate(DEFAULT_MPU_HZ);

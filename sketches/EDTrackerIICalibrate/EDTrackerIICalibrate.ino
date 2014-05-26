@@ -2,13 +2,12 @@
 //  Head Tracker Sketch
 //
 
-const char* PROGMEM infoString = "ED Tracker Calibration V2.0";
+const char* PROGMEM infoString = "ED Tracker Calibration V2.1";
 
 //
 // Changelog:
 // 2014-05-05 Initial Version
-
-//
+// 2014-20-05 Replace calibration loop - simple iterative method
 
 /* ============================================
 EDTracker device code is placed under the MIT License
@@ -130,9 +129,10 @@ void setup() {
   // DMP Update rate:       100Hz
   initialize_mpu() ;
   //grab the factory bias values 
+  delay(100);
   mpu_read_6050_accel_bias(fBias);  
   
-  loadBiases();
+ // loadBiases();  on start up just have he factory bias in there
    mpu_set_dmp_state(1);
   //mpu_get_biases
 //  enable_mpu();
@@ -208,24 +208,14 @@ void parseInput()
     {
       Serial.print("I\t");
       Serial.println(infoString);
-      loadBiases();
+      //loadBiases();
       mess("M\tGyro Bias ", gBias);
-
-      //      Serial.print("M\tGyro Bias ");
-      //      Serial.print(gBias[0]); Serial.print(" / ");
-      //      Serial.print(gBias[1]); Serial.print(" / ");
-      //      Serial.println(gBias[2]);
-
       mess("M\tAccel Bias ", aBias);
-      //      Serial.print("M\tAccel Bias ");
-      //      Serial.print(aBias[0]); Serial.print(" / ");
-      //      Serial.print(aBias[1]); Serial.print(" / ");
-      //      Serial.println(aBias[2]);
     }
     else if (command == 'B')
     {
       update_bias();
-    }
+    } 
 
     while (Serial.available() > 0)
       command = Serial.read();
@@ -266,62 +256,70 @@ void  initialize_mpu() {
 //  dmp_on = 1;
 //}
 
+// New bias function that peforms a simple adjust/test/adjust loop
+// Gives better, near zero, biased raw values which hopefully 
+// gives better DMP results.
 
 void update_bias()
 {
-  long gyroSum[3], accelSum[3];
-  int samples = 7;
+  long gyrozero[3];
+  int samples = 100;
   unsigned short i;
+  
+   //mpu_read_6050_accel_bias(aBias);  
+    //mpu_read_gyro_bias(gBias);
 
   for (i = 0; i < 3; i++)
   {
-    gyroSum[i] = 0;
-    accelSum[i] = 0;
+    gyrozero[i] = 0;
   }
 
-  // set gyro to zero and accel to factory bias
-  mpu_set_gyro_bias_reg(gyroSum);
-  mpu_set_accel_bias_6050_reg(fBias,false);
+  Serial.println("M\t Sampling for 5 seconds.");
 
-  Serial.println("M\t Sampling...");
+  // set gyro to zero and accel to factory bias
+  mpu_set_gyro_bias_reg(gyrozero);
+  mpu_set_accel_bias_6050_reg(fBias,0);
+
+  delay(100);
+
+  //return;
   //Serial.println(samples);
 
   for (int s = 0; s < samples; s++)
   {
     //physical values in Q16.16 format
-    mpu_get_biases(gBias, aBias);
+    //mpu_get_biases(gBias, aBias);
     
-    for (i = 0; i < 3; i++)
-    {
-      gyroSum[i] += gBias[i];
-      accelSum[i] += aBias[i];
-    }
+    dmp_read_fifo(gyro, accel, quat, &sensor_timestamp, &sensors, &more);
+    
+   if (accel[0] > 1) aBias[0]++; else if (accel[0] < -1) aBias[0]--;
+    if (accel[1] > 1) aBias[1]++; else if (accel[1] < -1) aBias[1]--;
+    if (accel[2] > 16384) aBias[2]++; else if (accel[2] <16384) aBias[2]--;
+ 
+
+    if (gyro[0] > 1) gBias[0]=gBias[0]-1; 
+    else if (gyro[0] < -1) gBias[0]=gBias[0]+1;
+    
+    if (gyro[1] > 1) gBias[1]--; 
+    else if (gyro[1] < -1) gBias[1]++;
+    
+    if (gyro[2] > 1) gBias[2]--; 
+    else if (gyro[2] < -1) gBias[2]++;
+    
+     mess("M\tGyro Bias ", gBias);
+     mess("M\tAccell Bias ", aBias);
+
+
+//push the  factory bias back
+  mpu_set_accel_bias_6050_reg(fBias,0);
+  mpu_set_gyro_bias_reg(gBias);
+  mpu_set_accel_bias_6050_reg(aBias,1);
+  delay(10);
+
   }
   
-  //Lets just store them in Q16.16 because we don't 
-  //know what bias method 
-  
-  for (i = 0; i < 3; i++)
-  {
-    gBias[i] = (long)(((float)gyroSum[i])/(float)samples);
-    aBias[i] = (long)(((float)accelSum[i])/(float)samples);
-  }
-
-  for ( i = 0; i < 3; i++)
-  {
-    gBias[i] = (long)(gBias[i] * 32.8) >> 16;
-    aBias[i] = (long)(aBias[i] * 2048) >> 16;
-  }
-
-
   mess("M\tGyro Bias ", gBias);
   mess("M\tAccel Bias ", aBias);
-
-//  unsigned short accel_sens;
-  //mpu_get_accel_sens(&accel_sens);
-
-//  int add = EE_XGYRO;
-//  int add2 = EE_XACCEL;
   
   for ( i=0;i<3;i++)
   {
@@ -332,6 +330,7 @@ void update_bias()
  loadBiases(); 
   return;
 }
+
 
 void tripple(short *v)
 {
@@ -353,7 +352,8 @@ void mess(char *m, long*v)
 void loadBiases() {
   
   //int add = ;
-  mpu_set_accel_bias_6050_reg(fBias,false);
+  mpu_set_accel_bias_6050_reg(fBias,0);
+  delay(500);
 
   for (int i=0;i < 3;i++)
   {
@@ -362,6 +362,6 @@ void loadBiases() {
   }
   
   mpu_set_gyro_bias_reg(gBias);
-  mpu_set_accel_bias_6050_reg(aBias,true);
+  mpu_set_accel_bias_6050_reg(aBias,1);
   return ;
 }
