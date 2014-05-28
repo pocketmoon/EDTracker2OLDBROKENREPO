@@ -11,6 +11,7 @@ const char* PROGMEM infoString = "EDTrackerII V2.4";
 // 2014-05-16 Stuff
 // 2014-05-20 Amend version number to keep in line with changes
 // 2014-05-23 Set Gyro and Accel FSR to keep DMP happy (undocumented req?)
+// 2014-05-28 Fix constrain
 //
 
 /* ============================================
@@ -382,9 +383,9 @@ if (sensor_timestamp == 0)
 
 
       //clamp at 90 degrees left and right
-      constrain(newX, -16383.0, 16383.0);
-      constrain(newY, -16383.0, 16383.0);
-      constrain(newZ, -16383.0, 16383.0);
+      newX = constrain(newX, -16383.0, 16383.0);
+      newY = constrain(newY, -16383.0, 16383.0);
+      newZ = constrain(newZ, -16383.0, 16383.0);
 
 #ifdef EXPONENTIAL
       long  iX = (0.0000304704 * newX * newX * xScale) * (newX / abs(newX)); //side mount = yaw
@@ -398,9 +399,9 @@ if (sensor_timestamp == 0)
 #endif
 
       // clamp after scaling to keep values within 16 bit range
-      constrain(iX, -32767, 32767);
-      constrain(iY, -32767, 32767);
-      constrain(iZ, -32767, 32767);
+      iX = constrain(iX, -32767, 32767);
+      iY = constrain(iY, -32767, 32767);
+      iZ = constrain(iZ, -32767, 32767);
 
       // Do it to it.
       joySt.xAxis = iX ;
