@@ -2,7 +2,7 @@
 //  Head Tracker Sketch
 //
 
-const char* PROGMEM infoString = "EDTrackerII V2.5";
+const char* PROGMEM infoString = "EDTrackerII V2.6";
 
 //
 // Changelog:
@@ -11,7 +11,8 @@ const char* PROGMEM infoString = "EDTrackerII V2.5";
 // 2014-05-16 Stuff
 // 2014-05-20 Amend version number to keep in line with changes
 // 2014-05-23 Set Gyro and Accel FSR to keep DMP happy (undocumented req?)
-// 2014-05-28 Fix constrain
+// 2014-05-28 Fix constraint
+// 2014-05-28 Test implementation of basic sping-back to counter yaw drift
 //
 
 /* ============================================
@@ -53,7 +54,13 @@ float yScale = 4.0;
 float zScale = 4.0;
 #endif;
 
-#define POLLMPUv
+
+//Variables used continual auto yaw compensation
+float dzX = 0.0;
+float lX = 0.0;
+unsigned int ticksInZone = 0;
+
+#define POLLMPUc
 
 #define EMPL_TARGET_ATMEGA328
 
@@ -184,7 +191,7 @@ long readLongEE(int address) {
 void setup() {
 
   Serial.begin(115200);
-  delay(5000);
+  delay(500);
 
 #ifdef DEBUG
   outputMode = UI;
@@ -265,7 +272,7 @@ void recenter()
 //unsigned char accel_fsr;  // accelerometer full-scale rate, in +/- Gs (possible values are 2, 4, 8 or 16).  Default:  2
 //unsigned short dmp_update_rate; // update rate, in hZ (possible values are between 4 and 1000).  Default:  100
 //unsigned short gyro_fsr;  // Gyro full-scale_rate, in +/- degrees/sec, possible values are 250, 500, 1000 or 2000.  Default:  2000
-boolean new_gyro ,dmp_on;
+boolean new_gyro , dmp_on;
 void loop()
 {
 
@@ -288,10 +295,10 @@ void loop()
     dmp_read_fifo(gyro, accel, quat, &sensor_timestamp, &sensors, &more);
 
     //
-      if (!more)
-          new_gyro = 0;
-          
-if (sensor_timestamp == 0)
+    if (!more)
+      new_gyro = 0;
+
+    if (sensor_timestamp == 0)
     {
       Quaternion q( (float)(quat[0] >> 16) / 16384.0f,
                     (float)(quat[1] >> 16) / 16384.0f,
@@ -388,14 +395,14 @@ if (sensor_timestamp == 0)
       newZ = constrain(newZ, -16383.0, 16383.0);
 
 #ifdef EXPONENTIAL
-      long  iX = (0.0000304704 * newX * newX * xScale) * (newX / abs(newX)); //side mount = yaw
-      long  iY = (0.0000304704 * newY * newY * yScale) * (newY / abs(newY)); //side mount = pich
-      long  iZ = (0.0000304704 * newZ * newZ * zScale) * (newZ / abs(newZ)); //side mount = roll
+      long  iX = (0.0000304704 * newX * newX * xScale) * (newX / abs(newX));
+      long  iY = (0.0000304704 * newY * newY * yScale) * (newY / abs(newY));
+      long  iZ = (0.0000304704 * newZ * newZ * zScale) * (newZ / abs(newZ));
 #else
       // and scale to out target range plus a 'sensitivity' factor;
-      long  iX = (newX * xScale );//side mount = yaw  *255
-      long  iY = (newY * yScale ); // side mount = pich
-      long  iZ = (newZ * zScale );//side mount = roll
+      long  iX = (newX * xScale );
+      long  iY = (newY * yScale );
+      long  iZ = (newZ * zScale );
 #endif
 
       // clamp after scaling to keep values within 16 bit range
@@ -409,6 +416,36 @@ if (sensor_timestamp == 0)
       joySt.zAxis = iZ;
 
       Tracker.setState(&joySt);
+
+      
+      //self centering
+      // if we're looking ahead, give or take 
+      //  and not moving 
+      //  and pitch is levelish then start to count
+      if (fabs(iX) < 3000.0 && fabs(iX-lX) < 5.0 && fabs(iY) < 600)
+      {
+        ticksInZone++;
+        dzX += iX;
+      }
+      else
+      {
+        ticksInZone = 0;
+        dzX = 0.0;
+      }
+      lX = iX;
+        
+      // if we stayed looking ahead-ish long enough then adjust yaw offset
+      if (ticksInZone >= 10)
+      {
+        // NB this currently causes a small but visible jump in the 
+        // view. Useful for debugging!
+        dzX = dzX / (float)10;
+        cx += dzX*0.1;
+        ticksInZone = 0;
+        dzX = 0.0;
+      }
+      
+      
 
       parseInput();
 
@@ -548,6 +585,17 @@ ISR(INT6_vect) {
 }
 #endif
 
+void tap_cb (unsigned char p1, unsigned char p2)
+{
+  if (outputMode == UI)
+  {
+    Serial.print("M\tTap Detected ");
+    Serial.print((int)p1);
+    Serial.print(" ");
+    Serial.println((int)p2);
+  }
+}
+
 
 boolean initialize_mpu() {
   int result;
@@ -557,11 +605,11 @@ boolean initialize_mpu() {
   /* Get/set hardware configuration. Start gyro. */
   /* Wake up all sensors. */
   mpu_set_sensors(INV_XYZ_GYRO | INV_XYZ_ACCEL);
-  
-  mpu_set_gyro_fsr (2000);
-  mpu_set_accel_fsr(2);
-  mpu_set_lpf(42);   
-  
+
+  mpu_set_gyro_fsr (4000);
+  mpu_set_accel_fsr(4);
+  mpu_set_lpf(42);
+
   /* Push both gyro and accel data into the FIFO. */
   mpu_configure_fifo(INV_XYZ_GYRO | INV_XYZ_ACCEL);
   mpu_set_sample_rate(DEFAULT_MPU_HZ);
@@ -574,15 +622,19 @@ boolean initialize_mpu() {
    */
 
   dmp_load_motion_driver_firmware();
-  
+
   DEBUG_PRINTLN("Firmware Loaded ");
 
   dmp_set_orientation(gyro_orients[orientation]);
   //while (dmp_set_orientation( inv_orientation_matrix_to_scalar(gyro_orientation)))
   DEBUG_PRINTLN("orientation Loaded ");
 
+  dmp_register_tap_cb(&tap_cb);
+
   unsigned short dmp_features = DMP_FEATURE_6X_LP_QUAT | DMP_FEATURE_SEND_RAW_ACCEL |
                                 DMP_FEATURE_SEND_CAL_GYRO | DMP_FEATURE_GYRO_CAL;
+
+  dmp_features = dmp_features |  DMP_FEATURE_TAP ;
 
   dmp_enable_feature(dmp_features);
   dmp_set_fifo_rate(DEFAULT_MPU_HZ);
@@ -626,7 +678,7 @@ void loadBiases() {
   //dmp_set_accel_bias(aBias);
 
   mpu_set_gyro_bias_reg(gBias);
-  mpu_set_accel_bias_6050_reg(aBias,true);
+  mpu_set_accel_bias_6050_reg(aBias, true);
 
   return ;
 }

@@ -1,3 +1,7 @@
+// 28/05/2014 Scale head movement to mimic in-game scaling
+//            Add toggle for this behaviour
+
+
 
 import toxi.geom.*;
 import toxi.geom.mesh.*;
@@ -30,7 +34,7 @@ String []messages = {
 };
 
 
-boolean swapPitchAxis = false;
+float headScale = 1.0;
 Serial  arduinoPort; // Usually the last port 
 int     portNumber = 2;
 String  portName ;
@@ -119,9 +123,9 @@ void setup() {
 
   ellipseMode(CENTER);
 
-  lpX = new iLowPass(180);  //The argument is the FIFO queue length
-  lpY = new iLowPass(180);  //The argument is the FIFO queue length
-  lpZ = new iLowPass(180);  //The argument is the FIFO queue length
+  lpX = new iLowPass(100);  //The argument is the FIFO queue length
+  lpY = new iLowPass(100);  //The argument is the FIFO queue length
+  lpZ = new iLowPass(100);  //The argument is the FIFO queue length
 }
 
 
@@ -219,7 +223,7 @@ void serialEvent(Serial p) {
         if (abs(rawGyroY) > maxGY)    maxGY = abs(rawGyroY) ;
         if (abs(rawGyroZ) > maxGZ)    maxGZ = abs(rawGyroZ) ;
 
-       //  println("A "+maxAX+" "+maxAY+" "+maxAZ+"   G "+maxGX+" "+maxGY+" "+maxGZ); 
+        //println("A "+maxAX+" "+maxAY+" "+maxAZ+"   G "+maxGX+" "+maxGY+" "+maxGZ); 
 
           
       }
@@ -273,7 +277,10 @@ void draw() {
       if (monitoring)
         arduinoPort.write('S');
       else
+      {
         arduinoPort.write('V');
+        arduinoPort.write('I');
+      }
     }
 
     if (monitoring)
@@ -293,11 +300,17 @@ void draw() {
         arduinoPort.write('P');
       }
 
+      if (key=='6')
+      {
+        if (headScale>0)  headScale =0.0;
+        else headScale = 1.0;
+      }
+
       if (key=='7')
       {
         driftScale *= 10.0;
         if (driftScale > 1001.0)
-          driftScale = 10.0;
+          driftScale = 1.0;
       }
 
       if (key=='8')
@@ -314,9 +327,9 @@ void draw() {
     //      
     if (key=='q' || key =='Q')
     {
-      if (monitoring)
-        arduinoPort.write('U');
-      delay(100);  
+      arduinoPort.write('S');
+        
+      delay(200);  
       arduinoPort.clear();
       arduinoPort.stop();
       exit();
@@ -348,6 +361,7 @@ void draw() {
   text("1 Toggle Monitoring", 10, 100);
   text("2 Get Info", 10, 120);
 
+
   if (!info.equals("Unknown Device"))
   {
     if (info.indexOf("Calib")<0)
@@ -355,7 +369,8 @@ void draw() {
       text("3 Reset View/Drift Tracking", 10, 140);
       text("4 ", 10, 160);
       text("5 Rotate Mounting Axis", 10, 180);
-      text("6 ", 10, 200);
+        text("6 Toggle Scaling", 10, 200);
+
       text("7 Adjust Drift Graph Scale", 10, 220);
       text("8 Save Drift Compensation", 10, 240);
     }
@@ -368,15 +383,29 @@ void draw() {
 
   fill(255, 200, 150);
 
+
+if (info.indexOf("Calib")<0)
+    {
   text("DMP Yaw", (int)width-240, 120);
   text (nfp(DMPYaw*rad2deg, 0, 2), (int)width-100, 120);
   text("DMP Pitch", (int)width-240, 100); 
   text (nfp( DMPPitch*rad2deg, 0, 2), (int)width-100, 100);
   text("DMP Roll", (int)width-240, 140);
   text (nfp(DMPRoll*rad2deg, 0, 2), (int)width-100, 140);
+    }
+    else
+    {
+  text("Raw X Accel", (int)width-240, 100);
+  text (rawAccelX, (int)width-100, 100); 
+  
+    text("Raw Y Accel", (int)width-240, 120);
+  text (rawAccelY, (int)width-100, 120);
+  
+ text("Raw Z Accel", (int)width-240, 140);
+  text (rawAccelZ, (int)width-100, 140);  
+    }
 
-  text("Raw Z Accel", (int)width-240, 160);
-  text (rawAccelZ, (int)width-100, 160); 
+  
 
   //text("Yaw Offset", (int)width-240, 440);
   //text (nfp(yawOffset*rad2deg, 0, 2), (int)width-100, 440);
@@ -444,12 +473,12 @@ void draw() {
   fill(255, 255, 0);
   stroke(255, 40, 40);
 
-  ellipse(670 + constrain (rawAccelX/10, -90, 90), 280 -constrain(rawAccelY/10, -90, 90), 5, 5);
+  ellipse(670 + constrain (rawAccelX/10, -90, 90), 280 -constrain(rawAccelY/20, -90, 90), 5, 5);
   //  ellipse(670 , 280 , 10, 10);
   
    fill(0, 255, 255);
   stroke(25, 255, 40);
-  ellipse(670 + constrain (rawGyroX, -90, 90), 280 -constrain(rawGyroY, -90, 90), 5, 5);
+  ellipse(670 + constrain (rawGyroX, -90, 90), 280 -constrain(rawGyroY/2, -90, 90), 5, 5);
 
 
 
@@ -458,8 +487,8 @@ void draw() {
   pointLight(255, 255, 255, 1000, -2000, 1000 );
   translate(width/2, height/2-20, 0);
 
-  rotateY(DMPYaw);// + yawOffset);
-  rotateX(DMPPitch);// + pitchOffset);
+  rotateY(DMPYaw * (1.0 + headScale*2.0));// + yawOffset);
+  rotateX(DMPPitch * (1.0 + headScale*2.0));// + pitchOffset);
 
   gfx.origin(new Vec3D(), 200);
   noStroke();
