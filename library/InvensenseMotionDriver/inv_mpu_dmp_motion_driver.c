@@ -484,7 +484,7 @@ static const unsigned short sStartAddress = 0x0400;
 #endif
 
 struct dmp_s {
-  //  void (*tap_cb)(unsigned char count, unsigned char direction);
+   void (*tap_cb)(unsigned char count, unsigned char direction);
   //  void (*android_orient_cb)(unsigned char orientation);
     unsigned short orient;
     unsigned short feature_mask;
@@ -493,7 +493,7 @@ struct dmp_s {
 };
 
 static struct dmp_s dmp = {
-   // .tap_cb = NULL,
+    .tap_cb = NULL,
   //  .android_orient_cb = NULL,
     .orient = 0,
     .feature_mask = 0,
@@ -1139,6 +1139,30 @@ void dmp_set_interrupt_mode(unsigned char mode)
     }
 }
 
+
+/**
+ *  @brief      Decode the four-byte gesture data and execute any callbacks.
+ *  @param[in]  gesture Gesture data from DMP packet.
+ *  @return     0 if successful.
+ */
+static int decode_gesture(unsigned char *gesture)
+{
+    unsigned char tap, android_orient;
+
+    tap = 0x3F & gesture[3];
+
+    if (gesture[1] & INT_SRC_TAP) {
+        unsigned char direction, count;
+        direction = tap >> 3;
+        count = (tap % 8) + 1;
+        if (dmp.tap_cb)
+            dmp.tap_cb(direction, count);
+    }
+
+    return 0;
+}
+
+
 /**
  *  @brief      Get one packet from the FIFO.
  *  If @e sensors does not contain a particular sensor, disregard the data
@@ -1224,12 +1248,21 @@ void  dmp_read_fifo(short *gyro, short *accel, long *quat,
         ii += 6;
         sensors[0] |= INV_XYZ_GYRO;
     }
+	
+	    if (dmp.feature_mask & (DMP_FEATURE_TAP | DMP_FEATURE_ANDROID_ORIENT))
+        decode_gesture(fifo_data + ii);
+	
+	
 *timestamp = 0;
     //get_ms(timestamp);
     return ;
 }
 
-
+uint8_t dmp_register_tap_cb(void (*func)(unsigned char, unsigned char))
+{
+    dmp.tap_cb = func;
+    return 0;
+}
 
 
 

@@ -508,17 +508,16 @@ const struct hw_s hw = {
 #endif
 };
 
-
-
+//mpu 6050
 const struct test_s test = {
     .gyro_sens      = 131,//32768/250,
-    .accel_sens     = 2048,//    16G//32768/16,
-   // .accel_sens     = 16384,//2g //32768/2,
-    .reg_rate_div   = 0,    /* 1kHz. */
-    .reg_lpf        = 1,    /* 188Hz. */
+    //.accel_sens     = 2048,//    16G//32768/16,   original
+    .accel_sens     = 16384,//2g //32768/2,    
+    .reg_rate_div   = 0,    /*  0 = 1kHz. */
+    .reg_lpf        = 1,    /* 1 = 188Hz. */
     .reg_gyro_fsr   = 0,    /* 250dps. */
-    .reg_accel_fsr  = 0x18, /* 16g. */
-   // .reg_accel_fsr  = 0, /* 2g. */
+    //.reg_accel_fsr  = 0x18, /* 16g. */ // original
+    .reg_accel_fsr  = 0, /* 2g. */     
     .wait_ms        = 50,
     .packet_thresh  = 5,    /* 5% */
     .min_dps        = 10.f,
@@ -592,7 +591,7 @@ const struct hw_s hw = {
 #endif
 };
 
-const struct test_s test = {
+const struct test_s test = {kjkljl
     .gyro_sens      = 131,//32768/250,
     .accel_sens     = 2048,//32768/16,
     .reg_rate_div   = 0,    /* 1kHz. */
@@ -823,10 +822,10 @@ void  mpu_init()
     st.chip_cfg.dmp_loaded = 0;
     st.chip_cfg.dmp_sample_rate = 0;
 
-    mpu_set_gyro_fsr(2000);
-    mpu_set_accel_fsr(2);
-    mpu_set_lpf(42);
-    mpu_set_sample_rate(50);
+    mpu_set_gyro_fsr(2000);//2000dps
+    mpu_set_accel_fsr(2);  //2g
+    mpu_set_sample_rate(50);//50
+    mpu_set_lpf(42);   // 188, 98, 42, 20, 10, 5
     mpu_configure_fifo(0);
     
 
@@ -2039,6 +2038,7 @@ static int get_st_biases_test(long *gyro, long *accel, unsigned char hw_test)
     if (i2c_write(st.hw->addr, st.reg->user_ctrl, 1, data))
         return -1;
     delay_ms(15);
+	
     data[0] = st.test->reg_lpf;
     if (i2c_write(st.hw->addr, st.reg->lpf, 1, data))
         return -1;
@@ -2128,7 +2128,7 @@ static int get_st_biases_test(long *gyro, long *accel, unsigned char hw_test)
 void get_st_biases(long *gyro, long *accel)
 {
     unsigned char data[MAX_PACKET_LENGTH];
-    unsigned char packet_count, ii;
+    unsigned char packet_count, ii,y;
     unsigned short fifo_count;
 
     data[0] = 0x01;
@@ -2145,6 +2145,8 @@ void get_st_biases(long *gyro, long *accel)
     data[0] = BIT_FIFO_RST | BIT_DMP_RST;
     i2c_write(st.hw->addr, st.reg->user_ctrl, 1, data);
     delay_ms(15);
+	
+	
     data[0] = st.test->reg_lpf;
     i2c_write(st.hw->addr, st.reg->lpf, 1, data);
     data[0] = st.test->reg_rate_div;
@@ -2173,11 +2175,20 @@ void get_st_biases(long *gyro, long *accel)
     packet_count = fifo_count / MAX_PACKET_LENGTH;
     gyro[0] = gyro[1] = gyro[2] = 0;
     accel[0] = accel[1] = accel[2] = 0;
-
-    for (ii = 0; ii < packet_count; ii++) {
+	
+    for (ii = 0; ii < packet_count; ii++) 
+	{
         short accel_cur[3], gyro_cur[3];
         i2c_read(st.hw->addr, st.reg->fifo_r_w, MAX_PACKET_LENGTH, data);
 		
+        for (y=0;y<3;y++)
+		{
+			accel_cur[y] = ((short)data[y*2] << 8) | data[(y*2)+1];	
+			accel[y]    += (long)accel_cur[y];
+			gyro_cur[y]  = (((short)data[6+y*2] << 8) | data[7+y*2]);
+			gyro[y]     += (long)gyro_cur[y];
+        }
+		/*
         accel_cur[0] = ((short)data[0] << 8) | data[1];
         accel_cur[1] = ((short)data[2] << 8) | data[3];
         accel_cur[2] = ((short)data[4] << 8) | data[5];
@@ -2189,7 +2200,7 @@ void get_st_biases(long *gyro, long *accel)
         gyro_cur[2] = (((short)data[10] << 8) | data[11]);
         gyro[0] += (long)gyro_cur[0];
         gyro[1] += (long)gyro_cur[1];
-        gyro[2] += (long)gyro_cur[2];
+        gyro[2] += (long)gyro_cur[2];*/
     }
 	
 	
@@ -2203,7 +2214,7 @@ void get_st_biases(long *gyro, long *accel)
     accel[0] = (long)(((long long)accel[0]<<16) / test.accel_sens / packet_count);
     accel[1] = (long)(((long long)accel[1]<<16) / test.accel_sens / packet_count);
     accel[2] = (long)(((long long)accel[2]<<16) / test.accel_sens / packet_count);
-	// ack! so now we have long 
+	// ack! so now we have long   16:16
 	
     /* Don't remove gravity! */
     if (accel[2] > 0L)
@@ -2211,7 +2222,7 @@ void get_st_biases(long *gyro, long *accel)
     else
         accel[2] += 65536L; // i.e. +1
 
-    return; // measured value * 65536L!
+    return; // physical value in 16:16
 }
 
 /**
@@ -2310,8 +2321,8 @@ restore:
     st.chip_cfg.clk_src = INV_CLK_PLL;
     mpu_set_gyro_fsr(gyro_fsr);
     mpu_set_accel_fsr(accel_fsr);
-    mpu_set_lpf(lpf);
     mpu_set_sample_rate(sample_rate);
+    mpu_set_lpf(lpf);
     mpu_set_sensors(sensors_on);
     mpu_configure_fifo(fifo_sensors);
 
@@ -2354,10 +2365,13 @@ void mpu_get_biases(long *gyro, long *accel)
     st.chip_cfg.sensors = 0xFF;
     st.chip_cfg.fifo_enable = 0xFF;
     st.chip_cfg.clk_src = INV_CLK_PLL;
+	
     mpu_set_gyro_fsr(gyro_fsr);
     mpu_set_accel_fsr(accel_fsr);
-    mpu_set_lpf(lpf);
+
     mpu_set_sample_rate(sample_rate);
+	mpu_set_lpf(lpf);
+
     mpu_set_sensors(sensors_on);
     mpu_configure_fifo(fifo_sensors);
 
@@ -2983,11 +2997,10 @@ void mpu_set_gyro_bias_reg(long *gyro_bias)
 	
     for(i=0;i<3;i++) 
 	{
-    	gyro_bias[i]= (-gyro_bias[i]);
+    	//gyro_bias[i]= (-gyro_bias[i]);
 		data[0] = (gyro_bias[i] >> 8) & 0xff;
         data[1] = (gyro_bias[i]) & 0xff;
 		i2c_write(st.hw->addr, 0x13+2*i, 2, &data[0]);
-
     }
 	/*
     data[0] = (gyro_bias[0] >> 8) & 0xff;
@@ -3051,7 +3064,7 @@ void  mpu_read_6050_accel_bias(long *accel_bias) {
 void  mpu_set_accel_bias_6050_reg(const long *accel_bias, unsigned char relative)
 {
     //unsigned char data[6] = {0, 0, 0, 0, 0, 0};
-	unsigned char data[2] ;//= {0, 0, 0, 0, 0, 0};
+	unsigned char data[2] = {0, 0, 0, 0, 0, 0};
     long accel_reg_bias[3] = {0, 0, 0};
     long mask = 0x0001;
     unsigned char mask_bit[3] = {0, 0, 0};
