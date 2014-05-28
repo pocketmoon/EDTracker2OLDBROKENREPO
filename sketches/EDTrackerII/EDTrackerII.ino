@@ -2,7 +2,7 @@
 //  Head Tracker Sketch
 //
 
-const char* PROGMEM infoString = "EDTrackerII V2.4";
+const char* PROGMEM infoString = "EDTrackerII V2.5";
 
 //
 // Changelog:
