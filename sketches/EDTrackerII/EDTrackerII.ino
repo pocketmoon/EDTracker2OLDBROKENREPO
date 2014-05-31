@@ -2,7 +2,7 @@
 //  Head Tracker Sketch
 //
 
-const char* PROGMEM infoString = "EDTrackerII V2.6";
+const char* PROGMEM infoString = "EDTrackerII V2.7";
 
 //
 // Changelog:
@@ -13,6 +13,7 @@ const char* PROGMEM infoString = "EDTrackerII V2.6";
 // 2014-05-23 Set Gyro and Accel FSR to keep DMP happy (undocumented req?)
 // 2014-05-28 Fix constraint
 // 2014-05-28 Test implementation of basic sping-back to counter yaw drift
+// 2014-05-28 Increase sample rate from 100 to 200 hz
 //
 
 /* ============================================
