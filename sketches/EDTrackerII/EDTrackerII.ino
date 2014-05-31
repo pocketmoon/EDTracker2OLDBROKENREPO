@@ -59,8 +59,9 @@ float zScale = 4.0;
 float dzX = 0.0;
 float lX = 0.0;
 unsigned int ticksInZone = 0;
+unsigned int reports = 0;
 
-#define POLLMPUc
+#define POLLMPUx
 
 #define EMPL_TARGET_ATMEGA328
 
@@ -253,7 +254,7 @@ void setup() {
 unsigned long sensor_timestamp;
 
 /* Starting sampling rate. */
-#define DEFAULT_MPU_HZ    (100)
+#define DEFAULT_MPU_HZ    (200)
 
 /****************************************
 * Gyro/Accel/DMP Configuration
@@ -275,8 +276,6 @@ void recenter()
 boolean new_gyro , dmp_on;
 void loop()
 {
-
-  delay(1);
   blink();
   nowMillis = millis();
 
@@ -359,6 +358,11 @@ void loop()
         return;
       }
 
+      short mag[3];
+      unsigned long timestamp;
+
+      mpu_get_compass_reg(mag, &timestamp);
+
       // apply calibration offsets
       newX = newX - cx;
       newY = newY - cy;
@@ -416,36 +420,39 @@ void loop()
       joySt.zAxis = iZ;
 
       Tracker.setState(&joySt);
+      reports++;
 
-      
+
       //self centering
-      // if we're looking ahead, give or take 
-      //  and not moving 
+      // if we're looking ahead, give or take
+      //  and not moving
       //  and pitch is levelish then start to count
-      if (fabs(iX) < 3000.0 && fabs(iX-lX) < 5.0 && fabs(iY) < 600)
+      if (outputMode != UI)
       {
-        ticksInZone++;
-        dzX += iX;
+        if (fabs(iX) < 3000.0 && fabs(iX - lX) < 5.0 && fabs(iY) < 600)
+        {
+          ticksInZone++;
+          dzX += iX;
+        }
+        else
+        {
+          ticksInZone = 0;
+          dzX = 0.0;
+        }
+        lX = iX;
+
+        // if we stayed looking ahead-ish long enough then adjust yaw offset
+        if (ticksInZone >= 10)
+        {
+          // NB this currently causes a small but visible jump in the
+          // view. Useful for debugging!
+          dzX = dzX / (float)10;
+          cx += dzX * 0.1;
+          ticksInZone = 0;
+          dzX = 0.0;
+        }
       }
-      else
-      {
-        ticksInZone = 0;
-        dzX = 0.0;
-      }
-      lX = iX;
-        
-      // if we stayed looking ahead-ish long enough then adjust yaw offset
-      if (ticksInZone >= 10)
-      {
-        // NB this currently causes a small but visible jump in the 
-        // view. Useful for debugging!
-        dzX = dzX / (float)10;
-        cx += dzX*0.1;
-        ticksInZone = 0;
-        dzX = 0.0;
-      }
-      
-      
+
 
       parseInput();
 
@@ -486,6 +493,11 @@ void loop()
           Serial.print(dX / (float)driftSamples);
           Serial.print("\t");
           Serial.println(xDriftComp);
+
+          Serial.print("M\t Updates per second ");
+          Serial.println(reports);
+          reports = 0;
+
         }
         //        DEBUG_PRINT("\t\t");
         //        DEBUG_PRINT(dY / (float)driftSamples );
