@@ -2,7 +2,7 @@
 //  Head Tracker Sketch
 //
 
-const char* PROGMEM infoString = "EDTrackerII V2.7";
+const char* PROGMEM infoString = "EDTrackerII V2.6";
 
 //
 // Changelog:
@@ -13,7 +13,7 @@ const char* PROGMEM infoString = "EDTrackerII V2.7";
 // 2014-05-23 Set Gyro and Accel FSR to keep DMP happy (undocumented req?)
 // 2014-05-28 Fix constraint
 // 2014-05-28 Test implementation of basic sping-back to counter yaw drift
-// 2014-05-28 Increase sample rate from 100 to 200 hz
+// 2014-05-28 Increase sample rate from 100 to 200 hz. 
 //
 
 /* ============================================
@@ -372,11 +372,11 @@ void loop()
       // Before we mess with any of the DMP data log it to the UI if enabled
       if (outputMode == UI)
       {
-        Serial.print(newX , 6 ); // Yaw
+        Serial.print(newX , 5 ); // Yaw
         Serial.print("\t");
-        Serial.print(newY, 6 ); // Pitch
+        Serial.print(newY, 5 ); // Pitch
         Serial.print("\t");
-        Serial.print(newZ, 6 ); // Roll
+        Serial.print(newZ, 5 ); // Roll
         Serial.print("\t");
 
         Serial.print(accel[0] ); //
@@ -495,8 +495,8 @@ void loop()
           Serial.print("\t");
           Serial.println(xDriftComp);
 
-          Serial.print("M\t Updates per second ");
-          Serial.println(reports);
+//          Serial.print("M\t Updates per second ");
+//          Serial.println(reports);
           reports = 0;
 
         }
@@ -521,6 +521,8 @@ void parseInput()
     {
       outputMode = OFF;
       Serial.println("S"); //silent
+      dmp_set_fifo_rate(DEFAULT_MPU_HZ);
+
     }
     else if (command == 'V')
     {
@@ -528,6 +530,8 @@ void parseInput()
       Serial.print("I\t");
       Serial.println(infoString);
       outputMode = UI;
+      dmp_set_fifo_rate(DEFAULT_MPU_HZ/2);
+
     }
     else if (command == 'I')
     {
@@ -619,8 +623,8 @@ boolean initialize_mpu() {
   /* Wake up all sensors. */
   mpu_set_sensors(INV_XYZ_GYRO | INV_XYZ_ACCEL);
 
-  mpu_set_gyro_fsr (4000);
-  mpu_set_accel_fsr(4);
+  mpu_set_gyro_fsr (2000);
+  mpu_set_accel_fsr(2);
   mpu_set_lpf(42);
 
   /* Push both gyro and accel data into the FIFO. */
