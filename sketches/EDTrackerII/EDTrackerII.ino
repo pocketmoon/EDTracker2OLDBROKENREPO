@@ -2,7 +2,7 @@
 //  Head Tracker Sketch
 //
 
-const char* PROGMEM infoString = "EDTrackerII V2.6";
+const char* PROGMEM infoString = "EDTrackerII V2.7";
 
 //
 // Changelog:
@@ -14,6 +14,7 @@ const char* PROGMEM infoString = "EDTrackerII V2.6";
 // 2014-05-28 Fix constraint
 // 2014-05-28 Test implementation of basic sping-back to counter yaw drift
 // 2014-05-28 Increase sample rate from 100 to 200 hz. 
+// 2014-06-02 Fix drift comp value stored in EEPROM
 //
 
 /* ============================================
@@ -213,7 +214,7 @@ void setup() {
 
   orientation = constrain(EEPROM.read(EE_ORIENTATION), 0, 3);
 
-  xDriftComp = (float)readIntEE(EE_XDRIFTCOMP) / 10000.0;
+  xDriftComp = (float)readIntEE(EE_XDRIFTCOMP) / 256.0;
 
   // join I2C bus (I2Cdev library doesn't do this automatically)
   Wire.begin();
@@ -577,7 +578,7 @@ void parseInput()
     {
       //Save Drift offset
       xDriftComp = (dX / (float)driftSamples) + xDriftComp;
-      writeIntEE(EE_XDRIFTCOMP, (int)(xDriftComp * 10000.0));
+      writeIntEE(EE_XDRIFTCOMP, (int)(xDriftComp * 256.0));
       Serial.print("M\tSaved Drift Comp ");
       Serial.println(xDriftComp);
       Serial.print("R\t");
