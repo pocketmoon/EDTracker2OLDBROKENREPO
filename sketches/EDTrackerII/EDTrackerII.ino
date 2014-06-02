@@ -2,11 +2,8 @@
 //  Head Tracker Sketch
 //
 
-<<<<<<< HEAD
+
 const char* PROGMEM infoString = "EDTrackerII V2.8";
-=======
-const char* PROGMEM infoString = "EDTrackerII V2.7";
->>>>>>> 357159f013e8d78ae7da65ce0e4b94753124be75
 
 //
 // Changelog:
@@ -17,14 +14,9 @@ const char* PROGMEM infoString = "EDTrackerII V2.7";
 // 2014-05-23 Set Gyro and Accel FSR to keep DMP happy (undocumented req?)
 // 2014-05-28 Fix constraint
 // 2014-05-28 Test implementation of basic sping-back to counter yaw drift
-<<<<<<< HEAD
 // 2014-05-28 Increase sample rate from 100 to 200 hz.
 // 2014-06-02 Fix drift comp value stored in EEPROM
 // 2014-06-02 Push bias to DMP rather than MPU
-=======
-// 2014-05-28 Increase sample rate from 100 to 200 hz. 
-// 2014-06-02 Fix drift comp value stored in EEPROM
->>>>>>> 357159f013e8d78ae7da65ce0e4b94753124be75
 //
 
 /* ============================================
@@ -605,13 +597,8 @@ void parseInput()
       //Save Drift offset
       xDriftComp = (dX / (float)driftSamples) + xDriftComp;
       writeIntEE(EE_XDRIFTCOMP, (int)(xDriftComp * 256.0));
-<<<<<<< HEAD
       //Serial.println("M\tSaved Drift Comp ");
       //Serial.println(xDriftComp);
-=======
-      Serial.print("M\tSaved Drift Comp ");
-      Serial.println(xDriftComp);
->>>>>>> 357159f013e8d78ae7da65ce0e4b94753124be75
       Serial.print("R\t");
       Serial.println(xDriftComp);
     }
