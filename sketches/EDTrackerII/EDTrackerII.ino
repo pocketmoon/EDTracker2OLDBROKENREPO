@@ -2,7 +2,7 @@
 //  Head Tracker Sketch
 //
 
-const char* PROGMEM infoString = "EDTrackerII V2.6";
+const char* PROGMEM infoString = "EDTrackerII V2.8";
 
 //
 // Changelog:
@@ -13,7 +13,9 @@ const char* PROGMEM infoString = "EDTrackerII V2.6";
 // 2014-05-23 Set Gyro and Accel FSR to keep DMP happy (undocumented req?)
 // 2014-05-28 Fix constraint
 // 2014-05-28 Test implementation of basic sping-back to counter yaw drift
-// 2014-05-28 Increase sample rate from 100 to 200 hz. 
+// 2014-05-28 Increase sample rate from 100 to 200 hz.
+// 2014-06-02 Fix drift comp value stored in EEPROM
+// 2014-06-02 Push bias to DMP rather than MPU
 //
 
 /* ============================================
@@ -43,12 +45,13 @@ THE SOFTWARE.
 
 // uncomment this in to enable exponential scaling of head motion
 // smaller movements near the centre, larger at the edges
+
 //#define EXPONENTIAL
 
 #ifdef EXPONENTIAL
-float xScale = 20.0;
-float yScale = 20.0;
-float zScale = 20.0;
+float xScale = 6.0;
+float yScale = 6.0;
+float zScale = 6.0;
 #else // standard linear response
 float xScale = 4.0;
 float yScale = 4.0;
@@ -126,13 +129,15 @@ float lastX, lastY, lastZ;
 float dX, dY, dZ;
 int driftSamples = 0;
 
+unsigned char revision;
+
 // packet structure for InvenSense teapot demo
 unsigned long lastMillis;
 unsigned long lastUpdate;
 
 float cx , cy, cz = 0.0;
 
-long gBias[3], aBias[3];
+long gBias[3], aBias[3], fBias[3];;
 
 //Running count of samples - used when recalibrating
 int   sampleCount = 0;
@@ -213,15 +218,15 @@ void setup() {
 
   orientation = constrain(EEPROM.read(EE_ORIENTATION), 0, 3);
 
-  xDriftComp = (float)readIntEE(EE_XDRIFTCOMP) / 10000.0;
+  xDriftComp = (float)readIntEE(EE_XDRIFTCOMP) / 256.0;
 
   // join I2C bus (I2Cdev library doesn't do this automatically)
   Wire.begin();
-  TWBR = 12;//24; // 24 400kHz I2C clock (200kHz if CPU is 8MHz)
+  TWBR = 12; // 24 400kHz I2C clock (200kHz if CPU is 8MHz)
 
   // Disable internal I2C pull-ups
-  //  cbi(PORTC, 4);
-  //  cbi(PORTC, 5);
+  cbi(PORTD, 0);
+  cbi(PORTD, 1);
 
   // Initialize the MPU:
   //
@@ -230,18 +235,23 @@ void setup() {
   // Gyro Low-pass filter:  42Hz
   // DMP Update rate:       100Hz
 
-  DEBUG_PRINTLN("M\tInitializing MPU... ");
+  DEBUG_PRINTLN("M\tInit MPU...");
 
   if ( initialize_mpu() ) {
-    loadBiases();
+    delay(100);
     enable_mpu();
+    delay(100);
+    mpu_read_6050_accel_bias(fBias);
+    delay(100);
+    loadBiases();
+
   }
   else {
-    DEBUG_PRINTLN("M\tInitialise Failed");
+    DEBUG_PRINTLN("M\tInit Failed");
     while (1);
   }
 
-  DEBUG_PRINTLN("M\tInit Complete. Settling.");
+  DEBUG_PRINTLN("M\t\Settling.");
 
 }
 
@@ -348,6 +358,7 @@ void loop()
             Serial.println(infoString);
             Serial.println("M\tRecentered");
           }
+          pushBias2DMP();
         }
         return;
       }
@@ -379,18 +390,23 @@ void loop()
         Serial.print(newZ, 5 ); // Roll
         Serial.print("\t");
 
-        Serial.print(accel[0] ); //
-        Serial.print("\t");
-        Serial.print(accel[1]); // Pitch
-        Serial.print("\t");
-        Serial.print(accel[2] ); // Roll
-        Serial.print("\t");
+//        Serial.print(accel[0] ); //
+//        Serial.print("\t");
+//        Serial.print(accel[1]); // Pitch
+//        Serial.print("\t");
+//        Serial.print(accel[2] ); // Roll
+//        Serial.print("\t");
+//
+//        Serial.print(gyro[0]); // Yaw
+//        Serial.print("\t");
+//        Serial.print(gyro[1] ); // Pitch
+//        Serial.print("\t");
+//        Serial.println(gyro[2]); // Roll
+        
+            tripple(accel);
+    tripple(gyro);
+        Serial.println("");
 
-        Serial.print(gyro[0]); // Yaw
-        Serial.print("\t");
-        Serial.print(gyro[1] ); // Pitch
-        Serial.print("\t");
-        Serial.println(gyro[2]); // Roll
       }
 
 
@@ -400,9 +416,14 @@ void loop()
       newZ = constrain(newZ, -16383.0, 16383.0);
 
 #ifdef EXPONENTIAL
-      long  iX = (0.0000304704 * newX * newX * xScale) * (newX / abs(newX));
-      long  iY = (0.0000304704 * newY * newY * yScale) * (newY / abs(newY));
-      long  iZ = (0.0000304704 * newZ * newZ * zScale) * (newZ / abs(newZ));
+      //      long  iX = (0.0000304704 * newX * newX * xScale) * (newX / abs(newX));
+      //      long  iY = (0.0000304704 * newY * newY * yScale) * (newY / abs(newY));
+      //      long  iZ = (0.0000304704 * newZ * newZ * zScale) * (newZ / abs(newZ));
+
+      long  iX = (0.000122076 * newX * newX * xScale) * (newX / abs(newX)); //side mount = yaw
+      long  iY = (0.000122076 * newY * newY * yScale) * (newY / abs(newY)); //side mount = pitch
+      long  iZ = (0.000122076 * newZ * newZ * zScale) * (newZ / abs(newZ)); //side mount = roll
+
 #else
       // and scale to out target range plus a 'sensitivity' factor;
       long  iX = (newX * xScale );
@@ -428,7 +449,7 @@ void loop()
       // if we're looking ahead, give or take
       //  and not moving
       //  and pitch is levelish then start to count
-      if (outputMode != UI)
+      if (outputMode != UI )
       {
         if (fabs(iX) < 3000.0 && fabs(iX - lX) < 5.0 && fabs(iY) < 600)
         {
@@ -447,7 +468,7 @@ void loop()
         {
           // NB this currently causes a small but visible jump in the
           // view. Useful for debugging!
-          dzX = dzX / (float)10;
+          dzX = dzX * 0.1;
           cx += dzX * 0.1;
           ticksInZone = 0;
           dzX = 0.0;
@@ -465,7 +486,7 @@ void loop()
         //        cy = cy + yDriftComp;
         //        cz = cz + zDriftComp;
 
-        lastUpdate = nowMillis + 1000;
+        lastUpdate = nowMillis + 100;
 
         driftSamples++;
 
@@ -495,8 +516,8 @@ void loop()
           Serial.print("\t");
           Serial.println(xDriftComp);
 
-//          Serial.print("M\t Updates per second ");
-//          Serial.println(reports);
+          //          Serial.print("M\t Updates per second ");
+          //          Serial.println(reports);
           reports = 0;
 
         }
@@ -530,7 +551,8 @@ void parseInput()
       Serial.print("I\t");
       Serial.println(infoString);
       outputMode = UI;
-      dmp_set_fifo_rate(DEFAULT_MPU_HZ/2);
+      if (DEFAULT_MPU_HZ > 101)
+        dmp_set_fifo_rate(DEFAULT_MPU_HZ / 2);
 
     }
     else if (command == 'I')
@@ -541,22 +563,18 @@ void parseInput()
       Serial.print("M\tOrientation ");
       Serial.println(orientation);
 
-      Serial.print("M\tDrift Compensation");
+      Serial.print("M\tDrift Comp");
       Serial.println(xDriftComp);
 
-      Serial.print("M\tCurrent Drift Rate ");
+      Serial.print("M\tDrift Rate ");
       Serial.println((dX / (float)driftSamples));
 
-      Serial.print("M\tGyro Bias ");
-      Serial.print(gBias[0]); Serial.print(" / ");
-      Serial.print(gBias[1]); Serial.print(" / ");
-      Serial.println(gBias[2]);
+      mess("M\tGyro Bias ", gBias);
+      mess("M\tAccel Bias ", aBias);
+      mess("M\tFact Bias ", fBias);
 
-      Serial.print("M\tAccel Bias ");
-      Serial.print(aBias[0]); Serial.print(" / ");
-      Serial.print(aBias[1]); Serial.print(" / ");
-      Serial.println(aBias[2]);
-
+      Serial.print("M\tMPU Revision ");
+      Serial.println(revision);
     }
     else if (command == 'P')
     {
@@ -577,12 +595,18 @@ void parseInput()
     {
       //Save Drift offset
       xDriftComp = (dX / (float)driftSamples) + xDriftComp;
-      writeIntEE(EE_XDRIFTCOMP, (int)(xDriftComp * 10000.0));
-      Serial.print("M\tSaved Drift Comp ");
-      Serial.println(xDriftComp);
+      writeIntEE(EE_XDRIFTCOMP, (int)(xDriftComp * 256.0));
+      //Serial.println("M\tSaved Drift Comp ");
+      //Serial.println(xDriftComp);
       Serial.print("R\t");
       Serial.println(xDriftComp);
     }
+    else if (command == 'F')
+    {
+       //flip where bias values are stored
+      pushBias2DMP();
+    }
+    
     while (Serial.available() > 0)
       command = Serial.read();
   }
@@ -604,32 +628,35 @@ ISR(INT6_vect) {
 
 void tap_cb (unsigned char p1, unsigned char p2)
 {
-  if (outputMode == UI)
-  {
-    Serial.print("M\tTap Detected ");
-    Serial.print((int)p1);
-    Serial.print(" ");
-    Serial.println((int)p2);
-  }
+  return;
+//  if (outputMode == UI)
+//  {
+//    Serial.print("M\tTap Detected");
+////    Serial.print((int)p1);
+////    Serial.print(" ");
+////    Serial.println((int)p2);
+//  }
 }
+
 
 
 boolean initialize_mpu() {
   int result;
 
-  mpu_init();
+  mpu_init(&revision);
 
   /* Get/set hardware configuration. Start gyro. */
   /* Wake up all sensors. */
   mpu_set_sensors(INV_XYZ_GYRO | INV_XYZ_ACCEL);
 
-  mpu_set_gyro_fsr (2000);
-  mpu_set_accel_fsr(2);
-  mpu_set_lpf(42);
+  mpu_set_gyro_fsr (2000);//250
+  mpu_set_accel_fsr(2);//4
+  //mpu_set_lpf(98);
 
   /* Push both gyro and accel data into the FIFO. */
   mpu_configure_fifo(INV_XYZ_GYRO | INV_XYZ_ACCEL);
   mpu_set_sample_rate(DEFAULT_MPU_HZ);
+  //mpu_set_lpf(42);
 
   /* To initialize the DMP:
    * 1. Call dmp_load_motion_driver_firmware(). .
@@ -643,13 +670,14 @@ boolean initialize_mpu() {
   DEBUG_PRINTLN("Firmware Loaded ");
 
   dmp_set_orientation(gyro_orients[orientation]);
-  //while (dmp_set_orientation( inv_orientation_matrix_to_scalar(gyro_orientation)))
-  DEBUG_PRINTLN("orientation Loaded ");
 
   dmp_register_tap_cb(&tap_cb);
 
   unsigned short dmp_features = DMP_FEATURE_6X_LP_QUAT | DMP_FEATURE_SEND_RAW_ACCEL |
-                                DMP_FEATURE_SEND_CAL_GYRO | DMP_FEATURE_GYRO_CAL;
+                                DMP_FEATURE_SEND_CAL_GYRO;// | DMP_FEATURE_GYRO_CAL;
+
+//testing with auto gyrpo call off and having a larger manual gyro compensartion
+//next is to combine linear with log curve do give soft middle and linear outside.
 
   dmp_features = dmp_features |  DMP_FEATURE_TAP ;
 
@@ -680,17 +708,22 @@ void enable_mpu() {
 }
 
 
-
 //
 void loadBiases() {
-  gBias[0] = readLongEE (EE_XGYRO);
-  gBias[1] = readLongEE (EE_YGYRO);
-  gBias[2] = readLongEE (EE_ZGYRO);
+//  gBias[0] = readLongEE (EE_XGYRO);
+//  gBias[1] = readLongEE (EE_YGYRO);
+//  gBias[2] = readLongEE (EE_ZGYRO);
+//
+//  aBias[0] = readLongEE (EE_XACCEL);
+//  aBias[1] = readLongEE (EE_YACCEL);
+//  aBias[2] = readLongEE (EE_ZACCEL);
 
-  aBias[0] = readLongEE (EE_XACCEL);
-  aBias[1] = readLongEE (EE_YACCEL);
-  aBias[2] = readLongEE (EE_ZACCEL);
-
+ for (int i=0;i < 3;i++)
+  {
+    gBias[i] = readLongEE (EE_XGYRO  + i*4);
+    aBias[i] = readLongEE (EE_XACCEL + i*4);
+  }
+  
   //dmp_set_gyro_bias(gBias); <- all sorts of undocumented shit
   //dmp_set_accel_bias(aBias);
 
@@ -699,6 +732,36 @@ void loadBiases() {
 
   return ;
 }
+
+
+void pushBias2DMP()
+{
+  //Serial.println("M\t Push Bias to DMP Regs.");
+  
+   if (outputMode == UI)
+  {
+    Serial.println("M\tPush Bias to DMP");
+  }
+  
+  mpu_set_accel_bias_6050_reg(fBias,0);
+
+  unsigned short accel_sens;
+
+  mpu_get_accel_sens(&accel_sens);
+  
+// 
+//    Serial.print("M\t Accel Sens ");
+//    Serial.println(accel_sens);
+//    
+    long a[3];
+    
+    for (int i=0;i<3;i++)
+      a[i] = (aBias[i]* (long)accel_sens); //<<6;
+
+  dmp_set_accel_bias(a);
+
+}
+
 
 void blink()
 {
@@ -716,4 +779,20 @@ void blink()
 }
 
 
+void tripple(short *v)
+{
+  for (int i = 0; i < 3; i++)
+  {
+    Serial.print(v[i] ); //
+    Serial.print("\t");
+  }
+}
 
+
+void mess(char *m, long*v)
+{
+  Serial.print(m);
+  Serial.print(v[0]); Serial.print(" / ");
+  Serial.print(v[1]); Serial.print(" / ");
+  Serial.println(v[2]);
+}

@@ -7,7 +7,8 @@ const char* PROGMEM infoString = "ED Tracker Calibration V2.1";
 //
 // Changelog:
 // 2014-05-05 Initial Version
-// 2014-20-05 Replace calibration loop - simple iterative method
+// 2014-05-20 Replace calibration loop - simple iterative method
+// 2014-06-02 Mess around with stuff
 
 /* ============================================
 EDTracker device code is placed under the MIT License
@@ -33,7 +34,7 @@ THE SOFTWARE.
 ===============================================
 */
 
-#define POLLMPU
+#define POLLMPUx
 
 #define EMPL_TARGET_ATMEGA328
 
@@ -51,6 +52,7 @@ THE SOFTWARE.
 #include <I2Cdev.h>
 #include <EEPROM.h>
 
+#include <helper_3dmath.h>
 
 extern "C" {
 #include <inv_mpu.h>
@@ -66,7 +68,7 @@ extern "C" {
 #define cbi(sfr, bit) (_SFR_BYTE(sfr) &= ~_BV(bit))
 #endif
 
-
+unsigned char revision;
 
 bool outputMode = true;
 
@@ -129,11 +131,14 @@ void setup() {
   // DMP Update rate:       100Hz
   initialize_mpu() ;
   //grab the factory bias values 
+
   delay(100);
-  mpu_read_6050_accel_bias(fBias);  
-  
- // loadBiases();  on start up just have he factory bias in there
-   mpu_set_dmp_state(1);
+  mpu_set_dmp_state(1);
+  delay(100);
+   mpu_read_6050_accel_bias(fBias);  
+  delay(100);
+  //loadBiases(); // on start up just have he factory bias in there
+  delay(100);
   //mpu_get_biases
 //  enable_mpu();
 }
@@ -175,9 +180,30 @@ void loop()
 // libs chopped so timestamp not returned
   dmp_read_fifo(gyro, accel, quat, &sensor_timestamp, &sensors, &more);
 
+
+ Quaternion q( (float)(quat[0] >> 16) / 16384.0f,
+                    (float)(quat[1] >> 16) / 16384.0f,
+                    (float)(quat[2] >> 16) / 16384.0f,
+                    (float)(quat[3] >> 16) / 16384.0f);
+                    
+   // Use some code to convert to R P Y
+      float newZ =  atan2(2.0 * (q.y * q.z + q.w * q.x), q.w * q.w - q.x * q.x - q.y * q.y + q.z * q.z);
+      float newY = -asin(-2.0 * (q.x * q.z - q.w * q.y));
+      float newX = -atan2(2.0 * (q.x * q.y + q.w * q.z), q.w * q.w + q.x * q.x - q.y * q.y - q.z * q.z);
+
+  // scale to range -32767 to 32767
+      newX = newX   * 10430.06;
+      newY = newY   * 10430.06;
+      newZ = newZ   * 10430.06;
+
   if (outputMode)
   {
-    Serial.print("0.0\t0.0\t0.0\t");
+     Serial.print(newX , 5 ); // Yaw
+        Serial.print("\t");
+        Serial.print(newY, 5 ); // Pitch
+        Serial.print("\t");
+        Serial.print(newZ, 5 ); // Roll
+        Serial.print("\t");
     tripple(accel);
     tripple(gyro);
     Serial.println("");
@@ -208,36 +234,61 @@ void parseInput()
     {
       Serial.print("I\t");
       Serial.println(infoString);
-      //loadBiases();
+      loadBiases();
       mess("M\tGyro Bias ", gBias);
       mess("M\tAccel Bias ", aBias);
+      mess("M\tFact Bias ", fBias);
+
+      Serial.print("M\tMPU Revision ");
+      Serial.println(revision);
     }
     else if (command == 'B')
     {
       update_bias();
     } 
+    else if (command == 'F')
+    {
+       //flip where bias values are stored
+      flipBias();
+    }
 
     while (Serial.available() > 0)
       command = Serial.read();
   }
 }
 
+void tap_cb (unsigned char p1, unsigned char p2)
+{
+    Serial.print("M\tTap Detected ");
+    Serial.print((int)p1);
+    Serial.print(" ");
+    Serial.println((int)p2);
+}
+
 
 void  initialize_mpu() {
 
-  mpu_init();
+  mpu_init(&revision);
 
   mpu_set_sensors(INV_XYZ_GYRO | INV_XYZ_ACCEL);
+  
+  mpu_set_gyro_fsr (2000);//250
+  mpu_set_accel_fsr(2);//4
+  //mpu_set_lpf(98);
+  
   mpu_configure_fifo(INV_XYZ_GYRO | INV_XYZ_ACCEL);
   mpu_set_sample_rate(DEFAULT_MPU_HZ);
 
   dmp_load_motion_driver_firmware();
 
-  //DEBUG_PRINT("Firmware Loaded ");
   dmp_set_orientation(B10001000);
 
+  dmp_register_tap_cb(&tap_cb);
+
   unsigned short dmp_features = DMP_FEATURE_6X_LP_QUAT | DMP_FEATURE_SEND_RAW_ACCEL |
-                                DMP_FEATURE_SEND_RAW_GYRO ;//| DMP_FEATURE_GYRO_CAL; //no cal for bias!
+                                DMP_FEATURE_SEND_RAW_GYRO; 
+                                
+  dmp_features = dmp_features |  DMP_FEATURE_TAP ;
 
   dmp_enable_feature(dmp_features);
   dmp_set_fifo_rate(DEFAULT_MPU_HZ);
@@ -274,7 +325,7 @@ void update_bias()
     gyrozero[i] = 0;
   }
 
-  Serial.println("M\t Sampling for 5 seconds.");
+  Serial.println("M\t Sampling..");
 
   // set gyro to zero and accel to factory bias
   mpu_set_gyro_bias_reg(gyrozero);
@@ -292,8 +343,8 @@ void update_bias()
     
     dmp_read_fifo(gyro, accel, quat, &sensor_timestamp, &sensors, &more);
     
-   if (accel[0] > 1) aBias[0]++; else if (accel[0] < -1) aBias[0]--;
-    if (accel[1] > 1) aBias[1]++; else if (accel[1] < -1) aBias[1]--;
+   if (accel[0] >= 2) aBias[0]++; else if (accel[0] <= -2) aBias[0]--;
+    if (accel[1] >= 2) aBias[1]++; else if (accel[1] <= -2) aBias[1]--;
     if (accel[2] > 16384) aBias[2]++; else if (accel[2] <16384) aBias[2]--;
  
 
@@ -314,8 +365,7 @@ void update_bias()
   mpu_set_accel_bias_6050_reg(fBias,0);
   mpu_set_gyro_bias_reg(gBias);
   mpu_set_accel_bias_6050_reg(aBias,1);
-  delay(10);
-
+  delay(17);
   }
   
   mess("M\tGyro Bias ", gBias);
@@ -351,17 +401,39 @@ void mess(char *m, long*v)
 
 void loadBiases() {
   
-  //int add = ;
+  //reset back to factory settings
   mpu_set_accel_bias_6050_reg(fBias,0);
-  delay(500);
+  delay(100);
 
   for (int i=0;i < 3;i++)
   {
     gBias[i] = readLongEE (EE_XGYRO  + i*4);
     aBias[i] = readLongEE (EE_XACCEL + i*4);
   }
-  
   mpu_set_gyro_bias_reg(gBias);
   mpu_set_accel_bias_6050_reg(aBias,1);
   return ;
 }
+
+
+void flipBias()
+{
+  Serial.println("M\t Push Bias to DMP Regs.");
+  mpu_set_accel_bias_6050_reg(fBias,0);
+
+  unsigned short accel_sens;
+
+  mpu_get_accel_sens(&accel_sens);
+    Serial.print("M\t Accel Sens ");
+    Serial.println(accel_sens);
+    
+    long a[3];
+    
+    for (int i=0;i<3;i++)
+      a[i] = (aBias[i]* (long)accel_sens);
+
+  dmp_set_accel_bias(a);
+   
+}
+
+
