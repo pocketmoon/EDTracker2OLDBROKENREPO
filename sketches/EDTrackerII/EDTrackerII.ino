@@ -3,7 +3,7 @@
 //
 
 
-const char* PROGMEM infoString = "EDTrackerII V2.8";
+const char* PROGMEM infoString = "EDTrackerII V2.8b";
 
 //
 // Changelog:
@@ -17,6 +17,7 @@ const char* PROGMEM infoString = "EDTrackerII V2.8";
 // 2014-05-28 Increase sample rate from 100 to 200 hz.
 // 2014-06-02 Fix drift comp value stored in EEPROM
 // 2014-06-02 Push bias to DMP rather than MPU
+// 2014-06-03 remove revision for now.
 //
 
 /* ============================================
@@ -644,7 +645,8 @@ void tap_cb (unsigned char p1, unsigned char p2)
 boolean initialize_mpu() {
   int result;
 
-  mpu_init(&revision);
+  //mpu_init(&revision);
+  mpu_init();
 
   /* Get/set hardware configuration. Start gyro. */
   /* Wake up all sensors. */
