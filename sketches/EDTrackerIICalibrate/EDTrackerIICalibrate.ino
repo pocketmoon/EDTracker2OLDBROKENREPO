@@ -268,7 +268,8 @@ void tap_cb (unsigned char p1, unsigned char p2)
 
 void  initialize_mpu() {
 
-  mpu_init(&revision);
+  //mpu_init(&revision);
+  mpu_init();
 
   mpu_set_sensors(INV_XYZ_GYRO | INV_XYZ_ACCEL);
   
